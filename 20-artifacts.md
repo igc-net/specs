@@ -1,4 +1,4 @@
-# igc-net v0.2 — Artifacts and Publication Modes
+# igc-net — Artifacts and Publication Modes
 
 **Status:** Normative  
 **Depends on:** `10-core.md`
@@ -23,11 +23,9 @@ The three modes are:
 | `protected` | Sanitized IGC plaintext (public) + raw IGC plaintext (companion) | None for sanitized; signed fetch request for raw companion |
 | `private` | Raw IGC plaintext | Signed fetch request required |
 
-All bytes are stored and served as plaintext. Confidentiality in flight is
-provided by iroh's end-to-end transport encryption (see
-`60-keys-and-access.md §9`). Confidentiality at rest on the serving node is
-a compliance and legal obligation on the node operator. No protocol-level
-content encryption (AEAD) is applied.
+All bytes are stored and served as plaintext. No protocol-level content
+encryption is applied; see `10-core.md §1.3` for the transport and at-rest
+confidentiality model.
 
 ---
 
@@ -75,8 +73,8 @@ raw_igc_hash --sanitized_as--> protected_hash
 An accepted owner claim on `raw_igc_hash` covers the `protected_hash`
 artifact linked by the `sanitized_as` relation. `(R-ART-16)`
 
-Both artifacts are plaintext bytes at rest and on the wire (over iroh). The
-raw companion is NOT encrypted at the protocol layer.
+Both artifacts are plaintext bytes at rest and on the wire; see
+`10-core.md §1.3`.
 
 ### 3.1 Normative sanitization algorithm
 
@@ -138,9 +136,7 @@ published).
 
 In `private` mode, the raw IGC bytes are served only to requesters who
 present a valid signed fetch request. The bytes themselves are stored and
-served as plaintext; confidentiality at rest on the serving node and
-authorized requester is a compliance and legal obligation, not a
-cryptographic protocol property.
+served as plaintext; see `10-core.md §1.3` for the confidentiality model.
 
 Public existence records carry only the identity anchor:
 
@@ -219,10 +215,10 @@ initial record. Because `created_at` is not an ordering authority,
 
 ### 6.2 Signing rules
 
-- The record MUST be signed by the pilot's root identity key (`pilot_id`).
+- Signed by `pilot_id` following `10-core.md §5`.
 - `record_id = BLAKE3(canonical_json(record_without_signature))`.
-- `created_at` is informational. It MUST NOT be used as the mode-change
-  ordering authority.
+- `created_at` is informational; `supersedes` is the ordering authority
+  (see `10-core.md §1.5`).
 
 ### 6.3 Initial mode authority
 

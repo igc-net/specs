@@ -1,4 +1,4 @@
-# igc-net v0.2 — Governance Sync
+# igc-net — Governance Sync
 
 **Status:** Normative  
 **Depends on:** `50-governance.md`, `30-transport.md`
@@ -49,6 +49,7 @@ The following record types are broadcast on the governance topic:
 - `deletion-request` — owner-signed erasure request
 - `roster-update` — roster add or remove record
 - `private-access-rotation-record` — pilot-signed authorization-key rotation
+- `pilot-auth-did-record` — pilot-signed authentication-DID binding and rotation
 
 Private-flight existence records (`raw_igc_hash` and serving-node tickets)
 are **NOT** propagated on the governance topic. They are data-plane
@@ -74,18 +75,13 @@ Records do NOT carry a separate `signing_key` field. The verification key is
 derived from the record's schema-specific identity field (defined in
 `10-core.md §5.3`):
 
-- Claims, mode records, deletion requests, private-access rotation records:
-  signed by the `pilot_id` root key.
+- Claims, mode records, deletion requests, private-access rotation records, and
+  `pilot-auth-did-record`s: signed by the `pilot_id` root key.
 - Approvals, challenges, resolutions, roster updates: signed by the
   `resolver_id` key or the project root key as appropriate.
-- There are no delegated or rotating **identity** signing keys in v0.2.
-  `private_access_keypair` is a separate authorization credential, not an
-  identity signing key; its rotation (via `private-access-rotation-record`)
-  does not change `pilot_id`.
+- For signing and key derivation rules see `10-core.md §5`.
 
-`created_at` in governance records is informational. It is used only as an
-expiry baseline for challenge records (defined in `50-governance.md §7.3`).
-It is NOT a general record-ordering authority.
+`created_at` in governance records is informational; see `10-core.md §1.5`.
 
 Nodes apply governance records in the order they are locally received. Local
 processing order is not a network-wide state-selection authority: when two
@@ -129,17 +125,3 @@ protocol violation, provided:
 Past serving decisions made in good faith under the then-current governance
 state are not retroactively penalised.
 
----
-
-## 5. Plane boundary (D2a)
-
-Private-flight discovery is split across two layers:
-
-- **Data plane** (`30-transport.md`): carries private-flight existence
-  announcements (`raw_igc_hash` plus locator tickets) on the announce topic.
-- **Governance plane** (this document): carries the policy state needed to
-  act on that discovery safely — ownership status, access mode, challenge
-  state, and the current authorized `private_access_public_key`.
-
-The governance topic MUST NOT carry private-flight existence records or locator
-tickets. The data-plane announce topic MUST NOT carry governance policy records.

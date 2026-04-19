@@ -36,8 +36,8 @@ That separation is a protocol constraint, not a documentation convenience.
 
 - Latest SPECS tagged release: `v0.1.0`
 - Latest REFERENCE IMPLEMENTATION tagged release: `v0.1.0`
-- Current specification work: `v0.2` draft
-- Public `v0.2` release/tag: not yet published
+- Current specification work: `v0.3` draft
+- Public `v0.3` release/tag: not yet published
 
 ## How to Read This Repository
 
@@ -53,9 +53,11 @@ Read these in dependency order:
 6. [50-governance.md](./50-governance.md)
 7. [55-governance-sync.md](./55-governance-sync.md)
 8. [60-keys-and-access.md](./60-keys-and-access.md)
-9. [70-durability.md](./70-durability.md)
-10. [80-analytics.md](./80-analytics.md)
-11. [90-conformance.md](./90-conformance.md)
+9. [65-pilot-auth-did.md](./65-pilot-auth-did.md)
+10. [70-durability.md](./70-durability.md)
+11. [80-analytics.md](./80-analytics.md)
+12. [90-conformance.md](./90-conformance.md)
+13. [92-threat-model.md](./92-threat-model.md)
 
 ### Informative guides and contributor docs
 
@@ -92,9 +94,11 @@ behavior, but they do not override the specification.
 
 ### v0.3
 
-- evaluate and prototype pilot identity and authorization integration with W3C DID
-- evaluate and prototype pilot profile integration with W3C Verifiable Credentials
-- threat model, abuse analysis, extension model, interop test suite
+- normative transition from native `pilot-profile` to `PilotProfileCredential`
+- `pilot_auth_did` as canonical wallet-held `did:key`
+- optional `did:web` for portal-issued/public-facing issuer identity and
+  non-authoritative public aliases
+- threat model, abuse analysis, extension model, interop fixtures, interop test suite
 
 ### v0.4
 

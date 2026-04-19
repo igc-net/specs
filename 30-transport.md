@@ -1,4 +1,4 @@
-# igc-net v0.2 — Transport
+# igc-net — Transport
 
 **Status:** Normative  
 **Depends on:** `10-core.md`, `20-artifacts.md`
@@ -91,9 +91,9 @@ artifact.
 
 ### 2.4 Signing rules
 
-- The announcement MUST be signed by the announcing node's `node_id` key.
+- Signed by the announcing node's `node_id` key following `10-core.md §5`.
 - `record_id = BLAKE3(canonical_json(record_without_signature))`.
-- `created_at` is informational.
+- `created_at` is informational; see `10-core.md §1.5`.
 
 ---
 
@@ -182,23 +182,19 @@ delivery time by the serving node, not by ticket availability.
 - Any node MAY fetch the sanitized artifact without authorization.
 - Same governance-state pre-check as §7.1 applies.
 
-### 7.3 Protected raw companion
+### 7.3 Non-public artifacts (protected raw companion and private raw IGC)
+
+Both the protected raw companion and private raw IGC require the same
+authorization:
 
 - The requester MUST prove possession of the pilot's
   `private_access_keypair` by signing the fetch request with the
   corresponding private key. `(R-TRANS-06)`
 - The serving node MUST verify this signature against the pilot's current
   `private_access_public_key` (see `60-keys-and-access.md §4`, §6) before
-  transmitting the raw companion plaintext. `(R-TRANS-07)`
+  transmitting. `(R-TRANS-07)`
 - Governance-state pre-check applies.
-- The raw companion is transmitted as plaintext over iroh; no
-  protocol-level content encryption is applied.
-
-### 7.4 Private raw IGC
-
-- Same as §7.3: `private_access_keypair` possession proof required.
-- The raw IGC is transmitted as plaintext over iroh; no protocol-level
-  content encryption is applied.
+- Bytes are transmitted as plaintext over iroh; see `10-core.md §1.3`.
 
 ### 7.5 Governance state pre-check
 

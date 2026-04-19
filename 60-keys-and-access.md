@@ -1,4 +1,4 @@
-# igc-net v0.2 — Keys and Access
+# igc-net — Keys and Access
 
 **Status:** Normative  
 **Depends on:** `10-core.md`, `20-artifacts.md`, `40-pilot-and-metadata.md`,
@@ -23,15 +23,11 @@ per pilot. Possession of this keypair is the sole authorization credential for
 all non-public content of that pilot. There are no separate per-content-type
 keys.
 
-igc-net does NOT perform protocol-level content encryption in v0.2. Private
-content is served as plaintext bytes over iroh's end-to-end encrypted
-peer-to-peer transport. A serving node that is asked for non-public content
-MUST verify a signed fetch request (see §4) before returning the bytes.
-Confidentiality at the serving node is a **compliance and legal obligation**
-on the node, not a cryptographic protocol property. This is the same trust
-model igc-net applies to archive nodes: the network trusts authorized
-custodians to keep what they hold private, and uses signatures to authorize
-who may fetch.
+igc-net does not perform protocol-level content encryption; see
+`10-core.md §1.3`. A serving node that is asked for non-public content MUST
+verify a signed fetch request (see §4) before returning the bytes. The network
+trusts authorized custodians to keep what they hold private, and uses
+signatures to authorize who may fetch.
 
 ---
 
@@ -44,7 +40,7 @@ two categories for that pilot:
 
 An identity-linked node has bound a local user account to a `pilot_id` through
 a node-local authentication mechanism (password, OAuth, magic link, etc.; the
-mechanism itself is outside the v0.2 protocol scope).
+mechanism itself is outside the protocol scope).
 
 An identity-linked node:
 
@@ -54,12 +50,13 @@ An identity-linked node:
 - MUST NOT fetch private-mode raw IGC bytes for that pilot.
 - MUST NOT fetch the raw companion bound to a `protected` flight of that
   pilot.
-- MUST NOT fetch, decrypt, store, index, or display any metadata record with
-  `visibility: "private"` belonging to that pilot (`pilot-profile`,
-  `flight-metadata`, `igc-metadata`). `(R-ACCESS-02)`
+- MUST NOT fetch, decrypt, store, index, or display any private native metadata
+  object belonging to that pilot (`flight-metadata`, `igc-metadata`).
+  `(R-ACCESS-02)`
 - MUST NOT display personal-identity fields (name, surname, nationality,
-  wing, competitions, etc.) for that pilot unless the pilot themselves has
-  published a `visibility: "public"` record carrying those fields.
+  wing, competitions, etc.) for that pilot unless the portal has a separately
+  verified, non-stale `PilotProfileCredential` or another explicit
+  pilot-authorized basis outside raw IGC headers.
 - SHOULD NOT extract, index, or otherwise harvest personal-identity fields
   from the headers of `public` IGC files it serves, outside records the
   pilot has explicitly authorized as public. `(R-ACCESS-03)` This obligation
@@ -76,12 +73,15 @@ A private-access node:
 - Has every capability of an identity-linked node.
 - MAY sign fetch requests for private content of that pilot using the
   `private_access_keypair` (private-mode raw IGC, protected raw companion,
-  private-visibility `pilot-profile`, private-visibility `flight-metadata`,
-  `igc-metadata`).
+  private-visibility `flight-metadata`, `igc-metadata`).
 - MAY store plaintext private content it has fetched.
 - MUST keep stored plaintext private content confidential as a compliance and
   legal obligation of its terms of service. The protocol does not enforce
   confidentiality at rest cryptographically. `(R-ACCESS-04)`
+
+`PilotProfileCredential` is not fetched via `private_access_keypair`. It is an
+application-layer credential presented by the pilot or by a pilot-authorized
+sync channel.
 
 A node operator declares the category at which the node operates (per pilot)
 through the node-local login / grant UX described in the operator guides.
@@ -107,7 +107,7 @@ through the node-local login / grant UX described in the operator guides.
 
 One `private_access_keypair` grants or revokes access to **all** of a pilot's
 non-public content simultaneously. `(R-ACCESS-06)` There is no per-flight,
-per-record-type, or per-visibility sub-scoping in v0.2.
+per-record-type, or per-visibility sub-scoping.
 
 ### 3.3 Key backup
 
@@ -184,9 +184,7 @@ Key-possession proof does not override governance state.
 ### 4.4 Transmission
 
 The serving node transmits the requested bytes as plaintext over the iroh
-peer-to-peer connection to the requester. Iroh provides end-to-end encryption
-on the transport layer; no additional protocol-layer encryption is applied to
-the content.
+peer-to-peer connection to the requester; see `10-core.md §1.3`.
 
 The serving node MUST NOT transmit any non-public byte to a requester that
 has not produced a valid, non-expired, non-replayed fetch request signed by
@@ -258,12 +256,13 @@ The pilot publishes this authorization by emitting a
 }
 ```
 
-- Signed directly by the pilot's root identity key (`pilot_id`).
+- Signed by `pilot_id` following `10-core.md §5`.
 - `record_id = BLAKE3(canonical_json(record_without_signature))`.
 - `supersedes` MUST reference the `record_id` of the previous active
   `private-access-rotation-record` for this `pilot_id`, or `null` for the
   initial record.
-- `created_at` is informational; `supersedes` is the ordering authority.
+- `created_at` is informational; `supersedes` is the ordering authority
+  (see `10-core.md §1.5`).
 
 ### 6.2 Initial record and rotation semantics
 
@@ -340,15 +339,7 @@ node.
 
 ## 9. Interaction with iroh transport
 
-igc-net v0.2 assumes iroh (or an equivalent transport) that:
-
-- Authenticates peers by their `node_id` public key.
-- Encrypts all peer-to-peer traffic end-to-end.
-- Provides forward secrecy on the transport layer.
-
-The protocol's no-protocol-level-content-encryption position (§1, §4.4) is
-conditional on this property. An implementation that uses a transport
-without end-to-end encryption is NOT conformant with v0.2. `(R-ACCESS-19)`
+The transport requirements are defined in `10-core.md §1.3`. `(R-ACCESS-19)`
 
 The fetch-request signature check (§4) is a content-authorization check,
 not a transport-authentication check. Both are required: the transport

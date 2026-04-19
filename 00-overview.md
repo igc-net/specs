@@ -1,4 +1,4 @@
-# igc-net v0.2 — Overview
+# igc-net — Overview
 
 **Status:** Normative  
 **Depends on:** nothing — this is the entry point
@@ -7,10 +7,10 @@
 
 ## 1. Scope
 
-igc-net v0.2 is a federated protocol for flight identity, artifact publication,
+igc-net is a federated protocol for flight identity, artifact publication,
 ownership governance, and private access control for IGC flight recorder files.
 
-v0.2 defines:
+This specification defines:
 
 - flight file identity
 - publication modes and artifact access state
@@ -24,7 +24,7 @@ v0.2 defines:
 - erasure and deletion semantics
 - governance topic and sync semantics
 
-v0.2 uses a **decentralised data plane** for artifact publication and transport,
+igc-net uses a **decentralised data plane** for artifact publication and transport,
 and a **permissioned governance plane** for ownership, access policy, and dispute
 resolution. These two planes are defined separately and must not be collapsed.
 
@@ -32,7 +32,7 @@ resolution. These two planes are defined separately and must not be collapsed.
 
 ## 2. Out of scope
 
-The following are explicitly out of scope for v0.2:
+The following are explicitly out of scope:
 
 - tandem flights (single-pilot ownership only)
 - club or shared ownership models
@@ -117,7 +117,7 @@ not governance claim types.
 
 Full definitions are in `60-keys-and-access.md §2`.
 
-`owner` is the only governance claim type in v0.2.
+`owner` is the only governance claim type in this specification.
 
 ---
 
@@ -165,10 +165,12 @@ state and key-possession proof.
 | `raw_igc_hash` | `BLAKE3(raw_igc_bytes)` — universal flight identity anchor |
 | `protected_hash` | `BLAKE3(sanitized_igc_bytes)` — sanitized artifact identity |
 | `pilot_id` | `"igcnet:id:" + hex(root_public_key_bytes)` — pilot identity string |
+| `pilot_auth_did` | Pilot's rotatable authentication / VC-issuer DID, bound authoritatively to `pilot_id` by `pilot-auth-did-record` |
 | `node_id` | Serving node Ed25519 keypair identity |
 | `resolver_id` | Trusted resolver Ed25519 keypair identity |
 | `private_access_keypair` | Pilot's Ed25519 keypair used to authorize fetch requests for non-public content (private raw IGC, protected raw companion, private metadata records, igc-metadata). Single credential covering all non-public content. |
 | `private_access_public_key` | Public half of `private_access_keypair`, published via `private-access-rotation-record` on the governance topic |
+| `PilotProfileCredential` | Self-issued VC-JWT carrying authoritative identity-level pilot profile fields |
 | identity-linked node (Category 1) | Node that knows a pilot's `pilot_id` but does NOT hold the pilot's `private_access_keypair`; may serve `public` and `protected` artifacts only |
 | private-access node (Category 2) | Node that holds a pilot's `private_access_keypair`; may sign fetch requests for the pilot's non-public content |
 | `publication_mode` | Artifact access state: `public`, `protected`, or `private` |
@@ -192,7 +194,7 @@ state and key-possession proof.
 
 ## 7. Document set
 
-The v0.2 normative specification consists of eleven documents.
+The normative specification consists of thirteen documents.
 
 | # | File | Purpose | Depends on |
 |---|------|---------|-----------|
@@ -200,13 +202,15 @@ The v0.2 normative specification consists of eleven documents.
 | 10 | `10-core.md` | Cryptographic primitives, identity anchors, canonical form | 00 |
 | 20 | `20-artifacts.md` | Publication modes, sanitization algorithm, artifact relations | 10 |
 | 30 | `30-transport.md` | Announce topics, wire format, deduplication, fetch rules | 10, 20 |
-| 40 | `40-pilot-and-metadata.md` | Pilot profile, flight metadata, igc metadata, record shapes | 10 |
+| 40 | `40-pilot-and-metadata.md` | Profile VC authority, flight metadata, igc metadata | 10 |
 | 50 | `50-governance.md` | Claim, approval, challenge, resolution, mode-change, deletion | 20, 40 |
 | 55 | `55-governance-sync.md` | Governance topic, propagation, ordering, catch-up | 50 |
 | 60 | `60-keys-and-access.md` | Node access categories, `private_access_keypair`, fetch authorization, rotation | 50 |
+| 65 | `65-pilot-auth-did.md` | Authentication DID binding and rotation | 10, 50, 55, 60 |
 | 70 | `70-durability.md` | Durability obligations, archive custody, deletion enforcement | 60 |
 | 80 | `80-analytics.md` | Optional analytics exchange model | 10, 20, 30 |
 | 90 | `90-conformance.md` | Requirement IDs, conformance profiles, cross-document invariants | all |
+| 92 | `92-threat-model.md` | Threat and abuse model for the identity and governance surface | 00, 10, 20, 30, 50, 55, 60, 65, 70 |
 
 ---
 
@@ -226,22 +230,24 @@ The v0.2 normative specification consists of eleven documents.
                55-governance-sync
                         |
                60-keys-and-access
-                        |
-                  70-durability
+                    /         \
+65-pilot-auth-did              70-durability
 
 80-analytics  ← depends on 10-core, 20-artifacts, 30-transport
 90-conformance ← depends on all normative documents
+92-threat-model ← depends on the core and identity docs
 ```
 
-Reading order for implementers: 00 → 10 → 20 → 30 → 40 → 50 → 55 → 60 → 70.
+Reading order for implementers: 00 → 10 → 20 → 30 → 40 → 50 → 55 → 60 → 65 → 70.
 Read 80 only if implementing the analytics extension.
 Read 90 for conformance mapping.
+Read 92 for the threat and abuse model.
 
 ---
 
 ## 9. Document precedence
 
-The eleven normative documents listed in §7 are authoritative.
+The normative documents listed in §7 are authoritative.
 
 `README.md` is informative. It exists as the repository landing page, index,
 status page, and migration note for the specification work. It does not add
@@ -264,41 +270,19 @@ text in the numbered documents remains the source of truth.
 
 ## 10. Cross-document invariants
 
-The following invariants constrain all normative documents. No document in the
-v0.2 set may contradict them.
+The complete, authoritative list of cross-document invariants is in
+`90-conformance.md §4`. No normative document in this specification may
+contradict those invariants, and no conformant implementation may violate them.
 
-1. `raw_igc_hash` is immutable once computed from a given set of IGC file
-   bytes.
-2. BLAKE3 is the exclusive hash function for all content hashes and record
-   IDs.
-3. Ed25519 is the exclusive signing algorithm. All identity signatures are
-   made directly from the role's identity key. There are no delegated or
-   rotating identity signing keys in v0.2. The pilot's
-   `private_access_keypair` is an authorization credential (not an identity
-   signing key) and MAY be rotated by the pilot through the
-   `private-access-rotation-record` defined in `60-keys-and-access.md §6`.
-4. No protocol-level authenticated encryption is applied to content. Content
-   confidentiality in flight is provided by the underlying iroh peer-to-peer
-   transport; confidentiality at rest for non-public content held at a
-   private-access node is a compliance and legal obligation on the node
-   operator.
-5. RFC 8785 canonical JSON is used for all signed records and all record-ID
-   computations.
-6. Governance state takes precedence over key possession for access
-   decisions. A serving node MUST refuse to deliver content for a flight in
-   `contested` or `rejected` governance state regardless of whether the
-   requester can sign a valid fetch request.
-7. Non-public content is served as plaintext bytes over iroh's end-to-end
-   encrypted transport, gated by a fetch request signed by the pilot's
-   currently authorized `private_access_keypair`. No AEAD envelope is
-   applied at the protocol layer; confidentiality at rest on serving and
-   durability nodes is a compliance and legal obligation.
-8. `publication_mode` governs artifact access state. `visibility` governs
-   metadata record privacy state. These terms must not be interchanged.
-9. `created_at` is informational and serves as an expiry baseline for
-   challenge records only. It is not a general record-ordering authority
-   and must not be used for conflict resolution or supersession decisions.
-10. Identity signing keys (`pilot_id`, `node_id`, `resolver_id`) are not
-    delegated and do not rotate in v0.2. The pilot's
-    `private_access_keypair` is separate from `pilot_id` and MAY be rotated
-    through the rotation record mechanism.
+Key invariants for orientation:
+
+- `raw_igc_hash` is immutable once computed.
+- BLAKE3 and Ed25519 are the exclusive hash and signing algorithms for all
+  native records.
+- No protocol-level content encryption is applied; iroh provides transport
+  confidentiality (see `10-core.md §1.3`).
+- Governance state takes precedence over key possession.
+- `created_at` is informational only; supersession chains are the ordering
+  authority (see `10-core.md §1.5`).
+- Governance identity signing keys (`pilot_id`, `node_id`, `resolver_id`) do
+  not delegate and do not rotate.

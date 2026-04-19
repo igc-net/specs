@@ -1,0 +1,11 @@
+{
+  "fixture_type": "pilot_did_mirror_precedence",
+  "version": "v0.3",
+  "case": {
+    "pilot_id": "igcnet:id:4a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789",
+    "authoritative_pilot_auth_did": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP",
+    "public_alias_did_web": "did:web:portal.example.org:pilots:alice-example",
+    "alias_points_to": "did:key:z6MkDifferentIllustrativeAliasValue111111111111111111111111",
+    "required_result": "governance binding wins; alias is non-authoritative"
+  }
+}

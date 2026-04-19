@@ -1,4 +1,4 @@
-# igc-net v0.2 — Governance
+# igc-net — Governance
 
 **Status:** Normative  
 **Depends on:** `10-core.md`, `20-artifacts.md`, `40-pilot-and-metadata.md`
@@ -7,7 +7,7 @@
 
 ## 1. Permissioned federation model
 
-igc-net v0.2 uses a human-curated **trusted resolver roster**. Only resolvers
+igc-net uses a human-curated **trusted resolver roster**. Only resolvers
 listed on this roster may issue governance records that the network accepts:
 approvals, challenges, resolutions, and roster updates.
 
@@ -113,7 +113,7 @@ if the signature over the record is cryptographically valid. `(R-GOV-21)`
 
 A claim is a signed assertion by a pilot that they own a specific flight.
 
-`owner` is the only governance claim type in v0.2. `uploader` and `custodian`
+`owner` is the only governance claim type. `uploader` and `custodian`
 are operational roles; they carry no governance weight and are not recorded as
 claim types.
 
@@ -135,30 +135,19 @@ claim types.
 
 ### 3.2 Signing rules
 
-- `record_id = BLAKE3(canonical_json(claim_without_signature))`. `(R-GOV-17)`
-- Signed directly from the pilot's root identity key (`pilot_id` keypair).
-- There are no delegated or rotating signing keys in v0.2.
-- `created_at` is informational; it is NOT the authority for claim ordering.
+- Signed by `pilot_id` following `10-core.md §5`. `(R-GOV-17)`
+- `record_id = BLAKE3(canonical_json(record_without_signature))`.
+- `created_at` is informational; see `10-core.md §1.5`.
 
 ---
 
 ## 4. Evidence
 
-Evidence supports a claim but does not alone determine the outcome. A trusted
-resolver evaluates evidence and issues an approval or rejection.
-
-| Class | Evidence | Role |
-|-------|----------|------|
-| E0 | Self-signed claim over `raw_igc_hash` | Proves key control only |
-| E1 | IGC pilot/glider metadata match | Weak; may be missing or wrong |
-| E2 | Platform account attestation | Stronger platform evidence |
-| E3 | Prior private upload/export records | Strong provenance evidence |
-| E4 | Device/logbook continuity | Supporting evidence |
-| E5 | Valid G-record plus recorder provenance | File authenticity evidence |
-| E6 | Resolver resolution | Accepted protocol outcome |
-
-Private evidence may remain resolver-local. Only a digest or basis label need
-be published if the underlying evidence is sensitive.
+A claim MAY include supporting evidence in the `evidence` array. Evidence
+supports a claim but does not alone determine the outcome — a trusted resolver
+evaluates it and issues an approval or rejection using their own judgement.
+Private evidence MAY remain resolver-local; only a basis label need be
+published if the underlying material is sensitive.
 
 ---
 
@@ -174,6 +163,10 @@ be published if the underlying evidence is sensitive.
 | `rejected` | Claim rejected by resolution |
 | `superseded` | Claim replaced by a resolution accepting a different claimant |
 | `revoked` | Accepted owner revoked their own claim |
+
+A resolution record whose `resolution` value is `"revoked"` (§8.2) produces
+the `revoked` governance state. These are two levels of the same concept:
+the resolution value names the outcome; the governance state reflects it.
 
 ### 5.2 Normal path
 
@@ -226,9 +219,9 @@ state. `(R-GOV-18)`
 }
 ```
 
-- Signed directly from the resolver's identity key (`resolver_id`).
+- Signed by `resolver_id` following `10-core.md §5`.
 - `claim_record_id` is the `record_id` of the claim being approved.
-- `created_at` is informational.
+- `created_at` is informational; see `10-core.md §1.5`.
 
 ---
 
@@ -306,10 +299,16 @@ A resolution records the final outcome for a contested or disputed claim.
 
 `claim_record_id` is the `record_id` of the claim being resolved.
 
-`supersedes` is an array of `record_id` values of prior resolutions for this
-same claim whose outcome this resolution overrides. Set to `[]` if this is the
-first resolution for this claim. A counter-resolution (`§8.3`) MUST list the
-`record_id` of each resolution it overrides.
+`supersedes` is an **array** of `record_id` values of prior resolutions for
+this same claim whose outcome this resolution overrides. Set to `[]` if this is
+the first resolution for this claim. A counter-resolution (`§8.3`) MUST list
+the `record_id` of each resolution it overrides.
+
+Note: `supersedes` on resolution records is an array because a
+counter-resolution may need to override multiple prior conflicting resolutions
+simultaneously. Other record types (`publication-mode-record`,
+`private-access-rotation-record`, `pilot-auth-did-record`) use a scalar
+`supersedes` because they form a single-predecessor chain.
 
 ### 8.2 Resolution values
 
@@ -327,10 +326,9 @@ unclosed challenge from a different resolver. `(R-GOV-15)` The counter-resolutio
 MUST list the `record_id` of the resolution it overrides in its `supersedes` array.
 
 **Tiebreak rule:** When two resolutions for the same claim are both in scope and
-neither's `supersedes` list references the other, the resolution signed by the
-resolver with the earlier roster entry date takes precedence. All compliant nodes
-derive the same result from the same canonical resolver roster, making this
-determination globally deterministic. `(R-GOV-22)`
+neither's `supersedes` list references the other, the resolution whose
+`record_id` is lexicographically smallest as a 64-character lowercase hex string
+takes precedence. This is deterministic across all compliant nodes. `(R-GOV-22)`
 
 A conflicting party MAY always initiate a new challenge to re-enter `contested`
 state regardless of which resolution is currently active.
@@ -379,6 +377,12 @@ Private-access nodes whose rotation record was bound to the old identity MUST
 stop honoring fetch-request signatures until the new rotation record arrives on
 the governance topic.
 
+Recovery also leaves the `pilot_auth_did` chain unset under `new_pilot_id`.
+No `PilotProfileCredential` for the pilot is verifiable by relying parties
+until the pilot publishes a new `pilot-auth-did-record` signed by `new_pilot_id`
+(see `65-pilot-auth-did.md §8`). The pilot SHOULD publish this record promptly
+after recovery.
+
 ### 10.2 Identity-recovery record shape
 
 ```json
@@ -395,7 +399,7 @@ the governance topic.
 }
 ```
 
-- Signed directly from the resolver's identity key (`resolver_id`).
+- Signed by `resolver_id` following `10-core.md §5`.
 - `record_id = BLAKE3(canonical_json(record_without_signature))`.
 - Propagated on the governance topic.
 - `old_pilot_id` and `new_pilot_id` MUST be distinct.
@@ -436,7 +440,7 @@ for a flight. Its full shape and mode-transition rules are defined in
 
 ---
 
-## 11a. Private-access rotation record
+## 12. Private-access rotation record
 
 The `private-access-rotation-record` establishes and updates the public key
 that serving nodes use to verify fetch-request signatures for a pilot's
@@ -455,12 +459,12 @@ non-public content. Its full shape and semantics are defined in
 
 ---
 
-## 12. Deletion request
+## 13. Deletion request
 
 A deletion request is a signed record from the accepted owner requesting
 compliant nodes to remove flight data.
 
-### 12.1 Deletion request shape
+### 13.1 Deletion request shape
 
 ```json
 {
@@ -477,7 +481,7 @@ compliant nodes to remove flight data.
 - `record_id = BLAKE3(canonical_json(record_without_signature))`.
 - Signed directly from the accepted owner's identity key (`pilot_id`).
 
-### 12.2 Compliant-node obligations
+### 13.2 Compliant-node obligations
 
 Upon receiving a valid deletion request for a `raw_igc_hash`:
 
@@ -487,10 +491,9 @@ Upon receiving a valid deletion request for a `raw_igc_hash`:
 3. Remove `flight-metadata` records that reference this `raw_igc_hash`.
 4. Remove `igc-metadata` records for this `raw_igc_hash`.
 
-Deletion does **NOT** delete the `pilot-profile` object. `pilot-profile` is
-identity-level, not flight-scoped. Deletion ends the flight's association with
-the pilot's profile for display purposes; it does not erase the pilot's
-identity.
+Deletion does **NOT** delete the pilot's identity-level profile authority.
+Deletion ends the flight's association with the pilot for display and custody
+purposes; it does not erase the pilot's identity.
 
 Complete distributed deletion is best-effort in a decentralised network.
 Non-compliant nodes cannot be cryptographically forced to delete. Compliant

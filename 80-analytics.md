@@ -1,4 +1,4 @@
-# igc-net v0.2 — Analytics (Optional Extension)
+# igc-net — Analytics (Optional Extension)
 
 **Status:** Normative (optional)  
 **Depends on:** `10-core.md`, `20-artifacts.md`, `30-transport.md`
@@ -8,9 +8,9 @@
 ## 1. Optional extension
 
 Analytics are an optional extension. A node that does not implement this
-document remains fully conformant with the rest of the v0.2 specification.
+document remains fully conformant with the rest of the core specification.
 
-Analytics are explicitly excluded from the v0.2 core. They exist on a
+Analytics are explicitly excluded from the core specification. They exist on a
 different timescale and with different trust semantics from artifact identity,
 ownership, and permissions. This document provides the minimum framing needed
 to prevent analytics from contaminating core metadata semantics.
@@ -25,7 +25,7 @@ Analytics in igc-net are derived data computed from flight artifacts:
   additional permission beyond what the flight's `publication_mode` already
   permits.
 - Analytics for `private` flights require **explicit pilot consent**; the
-  mechanism for tracking that consent is outside the v0.2 core.
+  mechanism for tracking that consent is outside the core specification.
 
 Most analytics providers have no legitimate need for pilot personal data
 and MAY operate as **identity-linked nodes** (Category 1 — see
@@ -79,7 +79,7 @@ with a `raw_igc_hash`. Minimal shape:
 Analytics objects are explicitly NOT authoritative over:
 
 - `raw_igc_hash` identity or any derived hash.
-- `pilot-profile` or `flight-metadata` fields.
+- `PilotProfileCredential` or `flight-metadata` fields.
 - Ownership or governance state.
 - `publication_mode` or `visibility`.
 

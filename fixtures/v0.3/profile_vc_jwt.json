@@ -1,0 +1,37 @@
+{
+  "fixture_type": "pilot_profile_credential",
+  "version": "v0.3",
+  "notes": [
+    "Illustrative VC-JWT fixture.",
+    "The JOSE signature input is not RFC 8785 canonical JSON.",
+    "Implementations should verify JOSE semantics and the active DID binding separately."
+  ],
+  "header": {
+    "alg": "EdDSA",
+    "typ": "vc+jwt",
+    "kid": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP#z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP"
+  },
+  "payload": {
+    "iss": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP",
+    "sub": "igcnet:id:4a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789",
+    "nbf": 1745572800,
+    "iat": 1745572800,
+    "jti": "urn:uuid:f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "vc": {
+      "@context": [
+        "https://www.w3.org/2018/credentials/v1"
+      ],
+      "type": [
+        "VerifiableCredential",
+        "PilotProfileCredential"
+      ],
+      "credentialSubject": {
+        "id": "igcnet:id:4a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789",
+        "pilot_auth_did": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP",
+        "name": "Alice Example",
+        "country": "NO"
+      }
+    }
+  },
+  "compact_jwt_example": "<base64url(header)>.<base64url(payload)>.<eddsa-signature>"
+}

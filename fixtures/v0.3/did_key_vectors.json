@@ -1,0 +1,13 @@
+{
+  "fixture_type": "did_key_vectors",
+  "version": "v0.3",
+  "vectors": [
+    {
+      "name": "all_zero_public_key_illustration",
+      "public_key_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "multicodec_prefix_hex": "ed01",
+      "did": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP",
+      "kid": "did:key:z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP#z6MkeTG3bFFSLYVU7VqhgZxqr6YzpaGrQtFMh1uvqGy1vDnP"
+    }
+  ]
+}

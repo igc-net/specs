@@ -1,4 +1,4 @@
-# igc-net v0.2 — Core Identifiers and Cryptographic Primitives
+# igc-net — Core Identifiers and Cryptographic Primitives
 
 **Status:** Normative  
 **Depends on:** `00-overview.md`
@@ -7,7 +7,7 @@
 
 ## 1. Cryptographic primitives
 
-All algorithm choices in v0.2 are single mandatory selections. No alternatives
+All algorithm choices are single mandatory selections. No alternatives
 are permitted. Interoperability requires identical algorithm use across all nodes.
 
 ### 1.1 Hash function
@@ -26,14 +26,14 @@ this specification requires a hash. `(R-CORE-01)`
 - Signing input is the canonical JSON bytes of the record's non-signature fields
   (see §5).
 - All signatures are made directly from the role's identity key.
-- There are no delegated signing keys in v0.2.
-- There are no rotating signing keys in v0.2.
+- There are no delegated signing keys in this specification.
+- There are no rotating signing keys in this specification.
 - A signature from any key other than the signer's current identity key MUST be
   rejected. `(R-CORE-03)`
 
 ### 1.3 Transport encryption
 
-igc-net v0.2 does NOT apply protocol-level authenticated encryption to
+igc-net does NOT apply protocol-level authenticated encryption to
 content. Confidentiality in flight is provided by the underlying iroh
 peer-to-peer transport, which encrypts all traffic end-to-end between
 authenticated node endpoints. Confidentiality at rest for non-public
@@ -43,7 +43,7 @@ on the node operator (see `60-keys-and-access.md §1`, §2.2, §8).
 The requirement on implementations: the transport used by a compliant
 node MUST provide end-to-end encryption and peer authentication between
 `node_id` endpoints. `(R-CORE-04)` An implementation that uses a transport
-without end-to-end encryption is NOT conformant with v0.2.
+without end-to-end encryption is NOT conformant.
 
 No AEAD envelope is applied to flight artifacts, metadata records, or
 fetch-request bodies. Signatures over RFC 8785 canonical JSON provide
@@ -168,6 +168,10 @@ igc-net defines three identity roles, each requiring a distinct Ed25519 keypair:
 - The pilot's `private_access_keypair` (defined in `60-keys-and-access.md`)
   is an authorization credential, not an identity. It MUST be a distinct
   Ed25519 keypair from `pilot_id`, `node_id`, and `resolver_id`.
+- The pilot's `pilot_auth_did` (defined in `65-pilot-auth-did.md`) is a
+  distinct authentication / VC-issuer credential. It MUST be a distinct
+  Ed25519 keypair from `pilot_id`, `private_access_keypair`, `node_id`, and
+  `resolver_id`.
 
 ---
 
@@ -204,7 +208,7 @@ identity field:
 
 | Schema | Identity field | Signing key |
 |--------|---------------|-------------|
-| `igc-net/claim`, `igc-net/publication-mode-record`, `igc-net/deletion-request`, `igc-net/pilot-profile`, `igc-net/flight-metadata`, `igc-net/private-access-rotation-record` | `pilot_id` | Strip `igcnet:id:` prefix; decode hex → Ed25519 public key |
+| `igc-net/claim`, `igc-net/publication-mode-record`, `igc-net/deletion-request`, `igc-net/flight-metadata`, `igc-net/private-access-rotation-record`, `igc-net/pilot-auth-did-record` | `pilot_id` | Strip `igcnet:id:` prefix; decode hex → Ed25519 public key |
 | `igc-net/claim-approval`, `igc-net/claim-challenge`, `igc-net/claim-resolution` | `resolver_id` | Decode hex → Ed25519 public key |
 | `igc-net/roster-update` | `signer_id` | Decode hex → Ed25519 public key; verifier MUST confirm `signer_id` is the project root key or an authorized roster member (see `50-governance.md §2.4`) |
 | `igc-net/resolver-profile` | `resolver_id` | Decode hex → Ed25519 public key |
@@ -231,5 +235,35 @@ To verify a record:
 5. Reject the record if signature verification fails or if the schema-identified
    signer is not authorised to produce this record type.
 
-There are no delegated or rotating signing keys in v0.2. All signatures MUST
-be made directly from the signer's current identity key.
+There are no delegated or rotating governance-signing keys. All native
+record signatures MUST be made directly from the signer's current identity key.
+`pilot_auth_did` is a separate authentication / VC-issuer credential, not a
+native governance-record signing key.
+
+---
+
+## 6. Protocol extensions
+
+This specification distinguishes between:
+
+- **native protocol records** that participate in `igc-net` signing and
+  `record_id` rules, and
+- **application-layer credential objects** such as VC-JWT payloads that do not.
+
+Extension naming rule:
+
+- A native protocol extension that is not part of the numbered core document set
+  MUST use an `x-` prefixed schema or field namespace to avoid collision with
+  future standardized core names.
+
+Extension signing rule:
+
+- If an extension is defined as a native signed JSON record, it MUST follow the
+  same RFC 8785 canonical JSON and BLAKE3 `record_id` rules as other native
+  signed records.
+
+Boundary rule:
+
+- JOSE / VC-JWT objects are not native `igc-net` records and MUST NOT be forced
+  into the native `record_id` or canonical-JSON signature model. They follow
+  their own JOSE / VC verification rules.

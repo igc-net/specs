@@ -1,4 +1,4 @@
-# igc-net v0.2 — Durability
+# igc-net — Durability
 
 **Status:** Normative  
 **Depends on:** `10-core.md`, `20-artifacts.md`, `50-governance.md`,
@@ -61,67 +61,35 @@ and legal obligations through its terms of service.
 
 ## 2. Compliant-node obligations after governance events
 
+The normative obligations are defined in the originating documents. This
+section provides cross-references for each trigger event.
+
 ### 2.1 After receiving a valid deletion request
 
-1. Stop serving all artifacts (public, protected, private) for the
-   referenced `raw_igc_hash` immediately. `(R-DUR-01)`
-2. Within 30 days: `(R-DUR-02)`
-   - Remove `igc-metadata` records for this `raw_igc_hash`.
-   - Remove `flight-metadata(scope="flight")` records that reference this
-     hash.
-   - Remove flight-scoped governance records and indexes for this hash.
-   - Remove any derived analytics records generated from this hash.
-3. End the display and association of this flight in the pilot's index.
-
-Deletion does **NOT** delete the `pilot-profile` object. `pilot-profile`
-is identity-level, not flight-scoped. Ending a flight's association with
-the pilot does not erase the pilot's identity or affect their other
-flights.
+See `50-governance.md §13.2`. Stop serving immediately `(R-DUR-01)`;
+remove flight-scoped records and indexes within 30 days `(R-DUR-02)`.
+Deletion does not affect the pilot's identity-level profile authority.
 
 ### 2.2 After receiving a mode upgrade record
 
-When a `publication-mode-record` changes the mode to a more restrictive
-value (e.g., `public` → `protected`, `protected` → `private`):
-
-- The serving node MUST immediately stop serving the previously permitted
-  artifact. `(R-DUR-03)`
-- The serving node MUST NOT wait for a cache TTL to expire. `(R-DUR-04)`
-- No separate deletion request is required to enforce the upgrade.
+See `20-artifacts.md §7.1`. Stop serving the previously permitted artifact
+immediately `(R-DUR-03)`; MUST NOT wait for a cache TTL `(R-DUR-04)`.
 
 ### 2.3 After `private_access_keypair` deletion
 
-When a pilot instructs a node to delete the `private_access_keypair`:
-
-1. The node MUST delete the keypair. `(R-DUR-05)`
-2. The node MUST stop serving all non-public content of that pilot,
-   because it can no longer sign fetch requests to refresh content nor
-   verify its own authority to serve it. `(R-DUR-06)`
-3. The node MAY retain plaintext bytes it already holds, but SHOULD delete
-   them as part of the revocation. Retention without the keypair is a
-   compliance matter, not a cryptographic enforcement.
-4. If the pilot has also issued a deletion request for the relevant
-   `raw_igc_hash`, the node MUST delete the raw IGC bytes entirely.
+See `60-keys-and-access.md §7`. Delete the keypair `(R-DUR-05)` and stop
+serving all non-public content for that pilot `(R-DUR-06)`.
 
 ### 2.4 After processing a `private-access-rotation-record`
 
-When a new `private-access-rotation-record` signed by the pilot arrives on
-the governance topic, and the node's currently held
-`private_access_keypair` (if any) no longer matches the new
-`private_access_public_key`:
-
-- The node MUST stop signing new fetch requests with the obsolete keypair.
-- The node MUST stop accepting fetch-request signatures that use the
-  obsolete `private_access_public_key` when serving content.
-- If the node needs ongoing private access, the pilot MUST grant the new
-  keypair through the flow in `60-keys-and-access.md §5`.
+See `60-keys-and-access.md §6.2`. Stop signing or accepting fetch-request
+signatures under the obsolete keypair immediately.
 
 ### 2.5 After receiving a challenge record
 
-When a valid challenge is received for a `raw_igc_hash`:
-
-- The node MUST freeze further non-public content release for that hash. `(R-DUR-07)`
-- The flight enters `contested` state; all fetch requests for restricted
-  content MUST be refused until the challenge is resolved. `(R-DUR-08)`
+See `50-governance.md §7.2`. Freeze non-public content release for the hash
+`(R-DUR-07)`; refuse all restricted fetch requests until resolved
+`(R-DUR-08)`.
 
 ---
 

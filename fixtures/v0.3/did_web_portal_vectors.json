@@ -1,0 +1,18 @@
+{
+  "fixture_type": "did_web_portal_vectors",
+  "version": "v0.3",
+  "notes": [
+    "Portal/public-node `did:web` remains optional and non-authoritative for pilot binding.",
+    "This fixture is for issuer-side `did:web` use and public alias semantics only."
+  ],
+  "issuer_example": {
+    "did": "did:web:portal.example.org",
+    "did_document_url": "https://portal.example.org/.well-known/did.json",
+    "usage": "portal-issued third-party VC issuer identity"
+  },
+  "pilot_alias_example": {
+    "did": "did:web:portal.example.org:pilots:alice-example",
+    "usage": "public-facing pilot alias or mirror only",
+    "authority_rule": "MUST NOT override `pilot_id` -> `pilot-auth-did-record` -> current `did:key`"
+  }
+}
