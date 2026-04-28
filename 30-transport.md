@@ -197,6 +197,36 @@ entries.
 A flight appears once in the index regardless of how many portals hold and
 announce it.
 
+### 5.1 Local artifact registry for service implementations
+
+An igc-net service implementation that exposes the normative gRPC API MUST
+maintain a local artifact registry sufficient to make fail-closed serving
+decisions without consulting portal-local application state at fetch time.
+
+For each known `raw_igc_hash`, the registry MUST be able to resolve at least:
+
+- `raw_igc_hash`
+- accepted owner `pilot_id`, if known
+- current effective `publication_mode`
+- current effective `protected_hash`, when mode is `protected`
+- protected raw companion identity, which is the same raw bytes identified by
+  `raw_igc_hash`
+- local blob availability by artifact class
+- processed deletion marker, if any
+- current contested or rejected governance state, if any
+- serving `node_id` and locator information known from announcements
+- current active `private_access_public_key` for the accepted owner, or enough
+  governance-chain state to determine that no active key is known
+
+The registry MAY be implemented as a flat file, embedded database, append-only
+log plus snapshot, or another durable structure. The representation is
+implementation-specific; the serving semantics are not.
+
+The registry MUST NOT treat portal-local ownership tables, web-session state, or
+metadata advertisements as a substitute for governance state. Portal state may
+seed uploads and local UI, but artifact serving decisions are made from
+igc-net artifact state plus governance state.
+
 ---
 
 ## 6. Re-announcement rules by mode
@@ -278,6 +308,77 @@ governance state for the `raw_igc_hash`:
 Governance state takes precedence over key possession. A requester who
 holds a valid `private_access_keypair` but requests a flight in
 `contested` or `rejected` state MUST be refused.
+
+### 7.6 `FetchArtifact` resolution
+
+The normative `FetchArtifact` RPC is resolved from `raw_igc_hash` plus
+`artifact_class`.
+
+Resolution order:
+
+1. Load the local artifact registry entry for `raw_igc_hash`.
+2. Confirm governance baseline and required catch-up state are current for the
+   hash and, for restricted classes, for the owning pilot's private-access key
+   chain.
+3. Apply the governance pre-check in §7.5.
+4. Resolve the current effective `publication_mode` and verify that the
+   requested `artifact_class` is allowed by `20-artifacts.md §1.1`.
+5. Resolve the local blob for the requested artifact class and verify its hash
+   as required by `20-artifacts.md §1.1`.
+6. For restricted artifact classes, resolve the accepted owner `pilot_id`, then
+   resolve that pilot's current active `private_access_public_key`, then verify
+   the signed fetch request from `60-keys-and-access.md §4`.
+7. Transmit bytes only after all prior checks succeed.
+
+If the accepted owner is unknown for a restricted artifact, the active
+private-access key cannot be resolved. The serving node MUST fail closed rather
+than infer ownership from the requesting key, local account state, or ticket
+possession.
+
+The proto `ErrorReason` values map to this sequence as follows:
+
+| Failure | Error reason |
+|---------|--------------|
+| Node stores are not open or service is not ready | `ERROR_REASON_NODE_NOT_READY` |
+| Governance state or dependency closure is stale | `ERROR_REASON_GOVERNANCE_STALE` |
+| No durable governance baseline is available where required | `ERROR_REASON_MISSING_GOVERNANCE_BASELINE` |
+| Current state is contested | `ERROR_REASON_CONTESTED` |
+| Current state is rejected | `ERROR_REASON_REJECTED` |
+| A deletion request has been processed | `ERROR_REASON_DELETED` |
+| Restricted request lacks a valid fetch proof | `ERROR_REASON_UNAUTHORIZED` |
+| Request uses a superseded private-access key | `ERROR_REASON_ROTATED_KEY` |
+| No active private-access rotation record is known | `ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD` |
+| Requested artifact class is not valid for the current mode | `ERROR_REASON_ARTIFACT_CLASS_NOT_ALLOWED` |
+| Requested valid blob is absent locally or fails hash verification | `ERROR_REASON_MISSING_BLOB` |
+| Request fields are malformed | `ERROR_REASON_INVALID_ARGUMENT` |
+
+### 7.7 `QueryIndex` and `SubscribeEvents`
+
+`QueryIndex` exposes the service's current local artifact index, not a global
+network truth. The index is derived from the local artifact registry,
+data-plane announcements, and applied governance state.
+
+`QueryIndex` entries MUST NOT expose an artifact as currently fetchable when the
+local service knows governance state forbids serving it. Entries for stale,
+deleted, contested, or rejected artifacts MAY be omitted or retained only in
+implementation-specific diagnostics; they MUST NOT be presented as ordinary
+fetchable results.
+
+`SubscribeEvents` streams local service index events from a local monotonic
+`seq` cursor. The cursor is scoped to one igc-net service instance and is not a
+network-wide ordering authority. Delivery is at-least-once: clients MUST handle
+duplicate events by `seq` and by the indexed `raw_igc_hash`.
+
+The service MUST persist enough event-cursor state to make `latest_event_seq`
+in `GetNodeStatus` meaningful across restart. If an implementation prunes old
+event history and a client asks for a `from_seq` older than the retained lower
+bound, the service MUST fail the subscription rather than silently starting from
+a later sequence.
+
+Events are emitted when local publish, remote announcement processing, or
+governance updates change the local index state visible through `QueryIndex`.
+Receiving a duplicate data-plane or governance record that does not change local
+index state MUST NOT require a new event.
 
 ---
 

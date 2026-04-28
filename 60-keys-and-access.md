@@ -22,6 +22,12 @@ per pilot. Possession of this keypair is the sole authorization credential for
 all pre-v0.5 non-public IGC content of that pilot. There are no separate per-content-type
 keys.
 
+One igc-net service instance may hold `private_access_keypair` material for
+multiple pilots. Custody is always keyed by `pilot_id`: provisioning,
+revocation, startup catch-up, restricted fetch signing, and plaintext deletion
+are evaluated per pilot. A service MUST NOT model `private_access_keypair` as a
+single instance-wide credential.
+
 igc-net does not perform protocol-level content encryption; see
 `10-core.md §1.3`. A serving node that is asked for non-public content MUST
 verify a signed fetch request (see §4) before returning the bytes. The network

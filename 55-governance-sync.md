@@ -268,3 +268,38 @@ protocol violation, provided:
 
 Past serving decisions made in good faith under the then-current governance
 state are not retroactively penalised.
+
+### 5.6 Service readiness and status
+
+The normative `GetNodeStatus` RPC reports readiness for the igc-net service
+instance, not for the surrounding portal.
+
+`ready` MUST be `true` only when:
+
+- the persistent `node_id` keypair is loaded
+- the blob store is open
+- the artifact registry and event cursor store are open
+- the service can validate and apply governance records
+- governance baseline and catch-up state are sufficient for every operation the
+  service is willing to perform
+
+`governance_baseline_ready` MUST report whether the durable governance baseline
+required by §5.2 has been recovered or built. If the service holds any
+`private_access_keypair`, `governance_baseline_ready = false` means restricted
+serving for affected pilots is not ready.
+
+`governance_sync_state` MUST distinguish at least:
+
+- not started
+- catching up
+- ready
+- stale
+- failed
+
+A service MAY be ready for public discovery while still refusing restricted
+serving for pilots whose governance state is stale. In that state,
+`FetchArtifact` for restricted classes MUST fail closed with the relevant
+governance or readiness error. `GetNodeStatus.ready` MUST NOT be used by
+clients as proof that every pilot-specific restricted-serving path is ready;
+`ProvisionPrivateAccessKeyResponse.restricted_serving_ready` is the
+pilot-specific readiness signal after key handover.

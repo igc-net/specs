@@ -271,8 +271,12 @@ that compliant obligations apply only to compliant nodes.
 ## 6. Test case to requirement mapping
 
 The following test-file convention maps each requirement namespace to a
-corresponding test document. These files are forward-looking; they are
-created as implementation progresses.
+corresponding test document. These files define the v0.3 draft conformance
+cases that implementations use when turning the normative text into executable
+tests. The Markdown cases are authoritative test intent; implementation
+harnesses may encode them in language-specific fixtures as long as they
+preserve the stated preconditions, actions, expected outcomes, and requirement
+coverage.
 
 | Test file | Requirement prefix |
 |-----------|------------------|
