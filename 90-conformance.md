@@ -29,13 +29,12 @@ requirements.
 | `R-CORE-xx` | Core identifiers and cryptographic primitives | `10-core.md` |
 | `R-ART-xx` | Artifacts and publication modes | `20-artifacts.md` |
 | `R-TRANS-xx` | Data-plane transport | `30-transport.md` |
-| `R-META-xx` | Pilot and metadata records | `40-pilot-and-metadata.md` |
+| `R-META-xx` | Public metadata advertisements | `40-pilot-and-metadata.md` |
 | `R-GOV-xx` | Governance semantics | `50-governance.md` |
 | `R-GSYNC-xx` | Governance sync and propagation | `55-governance-sync.md` |
 | `R-ACCESS-xx` | Keys, node categories, and access | `60-keys-and-access.md` |
 | `R-AUTH-xx` | Pilot authentication DID binding and rotation | `65-pilot-auth-did.md` |
 | `R-DUR-xx` | Durability and erasure | `70-durability.md` |
-| `R-ANA-xx` | Analytics (optional) | `80-analytics.md` |
 | `R-THREAT-xx` | Threat-driven security obligations | `92-threat-model.md` |
 
 Every `R-*` label MUST trace to at least one normative MUST or MUST NOT
@@ -65,9 +64,12 @@ publishes artifacts.
 - `R-CORE-*` — all cryptographic primitives, hash computation, identity
 - `R-ART-*` — publication mode selection, sanitization algorithm, mode
   record
-- `R-TRANS-*` — announce topic broadcast
+- Applicable `R-TRANS-*` requirements for announcements it emits. A minimal
+  publisher that does not serve or re-announce third-party artifacts is not
+  required to implement re-announcement, stale-ticket pruning, or governance
+  catch-up behavior.
 
-**MAY omit:** governance, metadata, durability, analytics.
+**MAY omit:** governance, metadata advertisements, durability, analytics.
 
 ### 3.2 Serving node
 
@@ -77,11 +79,13 @@ A serving node stores artifacts and responds to fetch requests.
 
 - `R-CORE-*`
 - `R-ART-*`
-- `R-TRANS-*` — announce and deduplication
+- `R-TRANS-*` — announce validation, deduplication, stale-announcement
+  handling, and re-announcement rules
 - `R-ACCESS-*` — fetch-request verification, governance state check
   before serving
-- `R-GSYNC-*` — governance topic subscription; governance state check;
-  processing of `private-access-rotation-record` and
+- `R-GSYNC-*` — governance topic subscription; validation, idempotent
+  duplicate handling, dependency closure, stale-state refusal, governance
+  state checks, and processing of `private-access-rotation-record` and
   `pilot-auth-did-record`
 
 **SHOULD implement:**
@@ -106,8 +110,10 @@ the pilot's `private_access_keypair`.
 
 **MUST NOT:**
 
-- Fetch `private` raw IGC bytes, protected raw companions, private
-  metadata records, or `igc-metadata` belonging to the logged-in pilot.
+- Fetch `private` raw IGC bytes or protected raw companions belonging to the
+  logged-in pilot.
+- Treat public metadata advertisements as authorization to fetch non-public IGC
+  bytes or portal-hosted protected/private resources.
 
 **MAY omit:** analytics.
 
@@ -122,8 +128,8 @@ sign fetch requests for the pilot's non-public content.
 - `R-ACCESS-*` — including holding, using, and rotating
   `private_access_keypair`; processing `private-access-rotation-record`;
   confidentiality-at-rest compliance obligations.
-- `R-META-*` — native metadata records (`flight-metadata`,
-  `igc-metadata`) and protected-flight identity display rules.
+- `R-GSYNC-*` — durable governance baseline and startup catch-up before
+  restricted serving for pilots whose keys are held locally.
 - `R-GOV-*` — claim submission, publication mode records, deletion
   requests.
 - `R-DUR-*`.
@@ -132,18 +138,25 @@ sign fetch requests for the pilot's non-public content.
 
 - Portal-to-portal key-exchange grant flow (`60-keys-and-access.md §5`).
 
+**Deferred until after v0.5:** standardized native metadata records,
+`igc-metadata`, and metadata merge behavior. A pre-v0.5 Private-Access Node is
+conformant if it implements private raw IGC and protected raw companion access
+without standardized metadata exchange.
+
 ### 3.5 Relying-party portal / authentication endpoint
 
-A relying-party portal or authentication endpoint verifies
-`PilotProfileCredential`, processes `pilot-auth-did-record` state for pilot
-authentication, and may cache latest verified profile VCs.
+A relying-party portal or authentication endpoint verifies application-layer
+pilot credentials, processes `pilot-auth-did-record` state for pilot
+authentication, and may cache latest verified profile credentials.
 
 **MUST implement:**
 
 - `R-AUTH-*`
-- `R-META-*` rules related to `PilotProfileCredential` verification,
-  staleness, and identity display
 - `R-THREAT-*` rules related to VC validation and authority boundaries
+
+**MAY implement:**
+
+- `R-META-*` public metadata advertisements
 
 **MUST NOT:**
 
@@ -186,7 +199,7 @@ is the canonical authority.
    keypairs.
 
 4. **No protocol-level content encryption.** igc-net does not apply any AEAD
-   envelope to flight artifacts, metadata records, or fetch-request
+   envelope to flight artifacts, metadata advertisements, or fetch-request
    bodies. Content confidentiality in flight is provided by the
    underlying iroh peer-to-peer transport; confidentiality at rest for
    non-public content is a compliance and legal obligation on the
@@ -201,19 +214,18 @@ is the canonical authority.
    `contested` or `rejected` governance state, regardless of whether the
    requester can sign a valid fetch request.
 
-7. **Non-public native content requires a signed fetch request.** Private
-   raw IGC bytes, protected raw companions, and native
-   `visibility: "private"` metadata records (including all
-   `igc-metadata`) MUST be served only to requesters who present a
-   fetch request signed by the pilot's currently authorized
-   `private_access_keypair`. `PilotProfileCredential` is not a
-   fetch-request-governed native object. The bytes transmitted are
+7. **Non-public IGC content requires a signed fetch request.** Private raw IGC
+   bytes and protected raw companions MUST be served only to requesters who
+   present a fetch request signed by the pilot's currently authorized
+   `private_access_keypair`. Public metadata advertisements do not grant access
+   to referenced protected or private resources. The bytes transmitted are
    plaintext; the iroh transport provides in-flight confidentiality.
 
-8. **`publication_mode` and `visibility` are distinct.**
+8. **`publication_mode` and metadata advertisement policy are distinct.**
    `publication_mode` governs artifact access state (`public`,
-   `protected`, `private`). `visibility` governs metadata record privacy
-   state. These MUST NOT be interchanged.
+   `protected`, `private`). Metadata advertisements are always public and may
+   only refer to access-controlled resources; they do not define or override
+   artifact access policy.
 
 9. **`created_at` is informational and an expiry baseline only.** The
    `created_at` field in governance records is informational. It is used
@@ -244,12 +256,12 @@ source references are given for each obligation.
 | Valid deletion request received | Stop serving all artifacts for `raw_igc_hash` | Immediate | `50-governance.md §13`, `70-durability.md §2.1` |
 | Valid deletion request received | Remove flight-scoped records and indexes | Within 30 days | `70-durability.md §2.1` |
 | Mode upgrade record received | Stop serving previously permitted artifact | Immediate | `20-artifacts.md §7.1`, `70-durability.md §2.2` |
-| Pilot instructs `private_access_keypair` deletion | Delete key; stop serving non-public content | Immediate | `60-keys-and-access.md §7`, `70-durability.md §2.3` |
+| Pilot instructs `private_access_keypair` deletion | Delete key; stop serving non-public content; delete restricted plaintext unless separately authorized by active durability custody | Immediate | `60-keys-and-access.md §7`, `70-durability.md §2.3` |
 | `private-access-rotation-record` processed with non-matching key | Stop signing / honoring signatures under the old key | Immediate | `60-keys-and-access.md §6.2`, `70-durability.md §2.4` |
 | Challenge record received | Freeze non-public content release for hash | Immediate | `50-governance.md §7.2`, `70-durability.md §2.5` |
 | Resolution: `rejected` | Refuse all fetches for hash | Immediate | `30-transport.md §7.5` |
 | Identity-linked node logged in | Refuse to accept `private_access_keypair`; refrain from scraping personal-identity fields | Continuous | `60-keys-and-access.md §2.1` |
-| `pilot-auth-did-record` rotation processed | Stop treating VCs under the superseded `pilot_auth_did` as authoritative | Immediate | `65-pilot-auth-did.md §5`, `40-pilot-and-metadata.md §2.4` |
+| `pilot-auth-did-record` rotation processed | Stop treating credentials under the superseded `pilot_auth_did` as authoritative | Immediate | `65-pilot-auth-did.md §5` |
 
 Operators MUST inform pilots that distributed deletion is best-effort and
 that compliant obligations apply only to compliant nodes.
@@ -272,7 +284,7 @@ created as implementation progresses.
 | `TEST.CASES.KEYS.md` | `R-ACCESS-*` |
 | `TEST.CASES.AUTH.md` | `R-AUTH-*` |
 | `TEST.CASES.DURABILITY.md` | `R-DUR-*` |
-| `TEST.CASES.ANALYTICS.md` | `R-ANA-*` |
+| `TEST.CASES.ANALYTICS.md` | Derived-metadata examples using `R-META-*` |
 | `TEST.CASES.THREAT.md` | `R-THREAT-*` |
 
 `R-*` labels are embedded inline at the relevant MUST/MUST NOT statements

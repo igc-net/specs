@@ -2,8 +2,8 @@
 
 **Status:** Normative
 
-**Depends on:** `10-core.md`, `40-pilot-and-metadata.md`,
-`50-governance.md`, `55-governance-sync.md`, `60-keys-and-access.md`
+**Depends on:** `10-core.md`, `50-governance.md`,
+`55-governance-sync.md`, `60-keys-and-access.md`
 
 ---
 
@@ -13,8 +13,8 @@ A pilot's cross-site identity is anchored by `pilot_id`: a non-rotating
 Ed25519 root public key that signs all pilot-authored governance records
 (claims, publication-mode records, deletion requests,
 `private-access-rotation-record`). For cross-portal authentication and for
-issuing self-signed Verifiable Credentials (notably
-`PilotProfileCredential`, see `40-pilot-and-metadata.md §2`), the pilot
+issuing self-signed Verifiable Credentials such as pilot profile credentials,
+the pilot
 uses a second, wallet-held credential: `pilot_auth_did`.
 
 Because `pilot_auth_did` lives in a pilot wallet and may be rotated
@@ -296,4 +296,3 @@ authorise fetches for private content, a compromise of
 The blast radius is bounded to authentication and VC issuance. Recovery
 is a single governance publication (the rotation record) without any
 dependency on the resolver network.
-

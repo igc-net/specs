@@ -8,7 +8,8 @@
 ## 1. Data-plane announce topic
 
 The data-plane announce topic is the well-known publish/subscribe topic used
-for flight artifact announcements. It is separate from the governance topic.
+for public data-plane records: flight artifact announcements and metadata
+advertisements. It is separate from the governance topic.
 
 ```
 announce_topic_id = BLAKE3(UTF-8("igc-net/announce/v1"))[0..32]
@@ -22,10 +23,12 @@ Derivation rules:
 - Output: the first 32 bytes of the BLAKE3 hash, encoded as 64-character
   lowercase hex.
 
-All data-plane artifact announcements are broadcast on this topic. The
+All data-plane artifact announcements and metadata advertisements are broadcast
+on this topic. The
 governance topic (defined in `55-governance-sync.md`) is separate;
 governance records MUST NOT be broadcast on the announce topic `(R-TRANS-01)`,
-and artifact announcements MUST NOT be broadcast on the governance topic. `(R-TRANS-02)`
+and artifact announcements or metadata advertisements MUST NOT be broadcast on
+the governance topic. `(R-TRANS-02)`
 
 ---
 
@@ -94,6 +97,50 @@ artifact.
 - Signed by the announcing node's `node_id` key following `10-core.md §5`.
 - `record_id = BLAKE3(canonical_json(record_without_signature))`.
 - `created_at` is informational; see `10-core.md §1.5`.
+
+### 2.5 Announcement validation and idempotency
+
+A node receiving an announcement MUST validate the record before indexing or
+re-announcing it: `(R-TRANS-18)`
+
+- `schema` is exactly `"igc-net/announcement"`.
+- `schema_version` is supported by the implementation.
+- `record_id` equals `BLAKE3(canonical_json(record_without_signature))`.
+- `signature` verifies against the `node_id` public key.
+- Hash fields and public keys are lowercase hex in the formats defined by
+  `10-core.md`.
+- Mode-specific fields obey §2.3.
+
+Invalid announcements MUST be dropped. A node MUST NOT index, re-announce, or
+serve because of an invalid announcement.
+
+Announcement processing is idempotent. Re-receiving the same `record_id` MUST
+NOT create a second index entry, duplicate tickets, or reset fresher local
+state. `(R-TRANS-19)`
+
+### 2.6 Announcement ordering and stale availability
+
+The announce topic is an availability plane, not an authority plane. It does
+not provide a global total order for flight state. `created_at` on an
+announcement is informational and MUST NOT be used to override governance
+records or to decide ownership, deletion, contest status, or the active
+publication mode. `(R-TRANS-20)`
+
+When multiple valid announcements for the same `raw_igc_hash` are received, a
+node MUST merge locator information by artifact class and serving `node_id`.
+The canonical flight identity remains `raw_igc_hash`; announcements do not
+create competing flight identities. `(R-TRANS-21)`
+
+If a received announcement conflicts with current governance state, governance
+wins. In particular, a stale `public` or `protected` announcement MUST NOT
+downgrade a current `private`, `deleted`, `contested`, or `rejected` state.
+The node MAY retain the locator as stale availability metadata, but MUST NOT
+serve or expose it as currently fetchable in contradiction of governance.
+`(R-TRANS-22)`
+
+Tickets are soft locators. A failed fetch, unreachable peer, or stale ticket
+MAY cause that locator to be deprioritized or removed, but it MUST NOT delete
+the canonical flight identity or override governance state. `(R-TRANS-23)`
 
 ---
 
@@ -165,9 +212,27 @@ Re-announcement rights depend on `publication_mode`: `(R-TRANS-14)`
 In all cases, the ticket is a locator only. Authorization is enforced at
 delivery time by the serving node, not by ticket availability.
 
+Before re-announcing a ticket, a node MUST verify that the artifact bytes it
+serves or references match the advertised hash for the artifact class. For
+public raw IGC this means `BLAKE3(raw_igc_bytes) == raw_igc_hash`; for the
+protected sanitized artifact this means `BLAKE3(sanitized_igc_bytes) ==
+protected_hash`; for protected raw companion and private raw IGC this means
+the raw bytes hash to `raw_igc_hash`. `(R-TRANS-24)`
+
+A node MUST NOT re-announce a ticket for an artifact class that the current
+governance state forbids it to serve. `(R-TRANS-25)` If governance state is
+unknown or stale for the affected `raw_igc_hash`, the node MAY keep the
+artifact locally but MUST NOT create new availability claims for it until the
+relevant governance state is current.
+
 ---
 
 ## 7. Fetch rules by mode
+
+The requester identifies the desired artifact class. The serving node MUST
+evaluate the requested class against the current effective `publication_mode`
+and governance state before transmitting bytes. The artifact-class serving
+matrix is defined in `20-artifacts.md §1.1`.
 
 ### 7.1 Public artifact
 
@@ -193,6 +258,8 @@ authorization:
 - The serving node MUST verify this signature against the pilot's current
   `private_access_public_key` (see `60-keys-and-access.md §4`, §6) before
   transmitting. `(R-TRANS-07)`
+- The signed fetch request MUST bind the requested artifact class; see
+  `60-keys-and-access.md §4.3`.
 - Governance-state pre-check applies.
 - Bytes are transmitted as plaintext over iroh; see `10-core.md §1.3`.
 
@@ -203,7 +270,10 @@ governance state for the `raw_igc_hash`:
 
 - `contested` governance state: MUST refuse all fetches. `(R-TRANS-08)`
 - `rejected` governance state: MUST refuse all fetches. `(R-TRANS-09)`
+- valid deletion request processed: MUST refuse all fetches. `(R-TRANS-26)`
 - `approved` or no claim: proceed with mode-appropriate fetch rules.
+- stale or incomplete governance state for the requested hash: MUST refuse
+  fetches for that hash until catch-up succeeds.
 
 Governance state takes precedence over key possession. A requester who
 holds a valid `private_access_keypair` but requests a flight in
@@ -218,11 +288,19 @@ discover public flights it missed.
 
 Implementations MUST support at least one of: `(R-TRANS-10)`
 
-- A gossip history window of sufficient depth (minimum recommended:
-  30 days).
+- A gossip history window of sufficient depth. The default public discovery
+  catch-up window is 3 days. Implementations MAY expose a longer configurable
+  window through node configuration. `(R-TRANS-16)`
 - A pull-based sync endpoint exposed by serving nodes, allowing a rejoining
   node to fetch announcement records by time range.
 
 This requirement applies to public content discovery on the data-plane
 announce topic. Governance catch-up requirements are defined in
 `55-governance-sync.md`.
+
+The public discovery catch-up window is not a complete governance authority.
+A node MUST NOT treat a 3-day announcement catch-up as proof that older
+deletion requests, challenges, rejections, restrictive mode changes, or
+private-access rotations do not exist. Serving decisions that depend on
+governance state require the governance baseline and catch-up rules in
+`55-governance-sync.md`. `(R-TRANS-17)`

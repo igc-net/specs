@@ -1,7 +1,7 @@
 # igc-net — Governance
 
 **Status:** Normative  
-**Depends on:** `10-core.md`, `20-artifacts.md`, `40-pilot-and-metadata.md`
+**Depends on:** `10-core.md`, `20-artifacts.md`
 
 ---
 
@@ -488,8 +488,9 @@ Upon receiving a valid deletion request for a `raw_igc_hash`:
 1. Stop serving all artifacts for this `raw_igc_hash` immediately. `(R-GOV-07)`
 2. Remove all flight-scoped governance records and indexes for this hash within
    30 days. `(R-GOV-08)`
-3. Remove `flight-metadata` records that reference this `raw_igc_hash`.
-4. Remove `igc-metadata` records for this `raw_igc_hash`.
+3. Remove local metadata-advertisement indexes for this `raw_igc_hash` where
+   the local node is the publisher. Remote public advertisements may persist
+   until their publishers remove or supersede them.
 
 Deletion does **NOT** delete the pilot's identity-level profile authority.
 Deletion ends the flight's association with the pilot for display and custody

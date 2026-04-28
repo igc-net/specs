@@ -45,7 +45,7 @@ node MUST provide end-to-end encryption and peer authentication between
 `node_id` endpoints. `(R-CORE-04)` An implementation that uses a transport
 without end-to-end encryption is NOT conformant.
 
-No AEAD envelope is applied to flight artifacts, metadata records, or
+No AEAD envelope is applied to flight artifacts, metadata advertisements, or
 fetch-request bodies. Signatures over RFC 8785 canonical JSON provide
 integrity and origin authentication where needed (see §5).
 
@@ -92,8 +92,9 @@ raw_igc_hash = BLAKE3(raw_igc_bytes)
 - `raw_igc_hash` is independent of upload time, uploader identity, portal
   identity, and any metadata.
 - `raw_igc_hash` is immutable once computed. `(R-CORE-08)`
-- All subsequent records (claims, artifacts, metadata, governance records) MUST
-  reference `raw_igc_hash` as the flight identity. `(R-CORE-09)`
+- All subsequent flight-scoped records (claims, artifacts, flight-scoped
+  metadata advertisements, governance records) MUST reference `raw_igc_hash` as
+  the flight identity. `(R-CORE-09)`
 
 Two portals independently receiving the same IGC file bytes MUST compute the
 same `raw_igc_hash`. `(R-CORE-10)`
@@ -155,7 +156,7 @@ igc-net defines three identity roles, each requiring a distinct Ed25519 keypair:
 
 | Role | Identifier | Keypair purpose |
 |------|-----------|----------------|
-| Pilot | `pilot_id` | Signs claims, metadata, mode-change records |
+| Pilot | `pilot_id` | Signs pilot-authored governance records |
 | Serving node | `node_id` | Signs announcements and fetch tickets |
 | Trusted resolver | `resolver_id` | Signs approvals, challenges, resolutions |
 
@@ -208,13 +209,12 @@ identity field:
 
 | Schema | Identity field | Signing key |
 |--------|---------------|-------------|
-| `igc-net/claim`, `igc-net/publication-mode-record`, `igc-net/deletion-request`, `igc-net/flight-metadata`, `igc-net/private-access-rotation-record`, `igc-net/pilot-auth-did-record` | `pilot_id` | Strip `igcnet:id:` prefix; decode hex → Ed25519 public key |
+| `igc-net/claim`, `igc-net/publication-mode-record`, `igc-net/deletion-request`, `igc-net/private-access-rotation-record`, `igc-net/pilot-auth-did-record` | `pilot_id` | Strip `igcnet:id:` prefix; decode hex → Ed25519 public key |
 | `igc-net/claim-approval`, `igc-net/claim-challenge`, `igc-net/claim-resolution` | `resolver_id` | Decode hex → Ed25519 public key |
 | `igc-net/roster-update` | `signer_id` | Decode hex → Ed25519 public key; verifier MUST confirm `signer_id` is the project root key or an authorized roster member (see `50-governance.md §2.4`) |
 | `igc-net/resolver-profile` | `resolver_id` | Decode hex → Ed25519 public key |
 | `igc-net/announcement` | `node_id` | Decode hex → Ed25519 public key |
-| `igc-net/igc-metadata` | `node_id` | Decode hex → Ed25519 public key |
-| `igc-net/analytics` | `provider_id` | Decode hex → Ed25519 public key |
+| `igc-net/metadata-advertisement` | `node_id` | Decode hex → Ed25519 public key |
 | `igc-net/fetch-request` | `requester_key` | Decode hex → Ed25519 public key (MUST match current `private_access_public_key` for the pilot) |
 
 To sign a record:

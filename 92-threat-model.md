@@ -157,8 +157,8 @@ split: `pilot_auth_did` is additive and does NOT sign governance records.
 
 - **Blast radius.** The attacker can sign fetch requests for the
   pilot's private raw IGC, the raw companion of protected flights,
-  and private native metadata (`flight-metadata`, `igc-metadata`). The
-  attacker CANNOT sign governance records,
+  and any future fetch-gated non-public content explicitly added by a later
+  version. The attacker CANNOT sign governance records,
   CANNOT issue VCs, and CANNOT cause publication-mode or deletion
   changes.
 - **Recovery path.** The pilot publishes a
@@ -226,8 +226,8 @@ rotates both credentials using `pilot_id` as signer.
   algorithm redacts identity fields in the public artifact served for
   `protected` flights. For `public` flights, headers remain intact by
   design. This gap is addressed by the scrape-avoidance obligation
-  (`R-ACCESS-03`) and the protected-flight identity-display rule
-  (`R-META-15`) rather than a cryptographic control.
+  (`R-ACCESS-03`) and the protected-flight identity-display rule in
+  `20-artifacts.md §3.2` rather than a cryptographic control.
 - **Ticket spoofing / fetch-auth bypass.** Mitigated by serving-node
   verification of fetch-request signatures against the current
   `private_access_public_key` (`R-ACCESS-08`–`R-ACCESS-13`). A ticket
@@ -264,7 +264,8 @@ Protocol-level controls:
   records the pilot has explicitly authorized (`R-ACCESS-03`).
   `(R-THREAT-07)`
 - Portals MUST NOT use the sanitized protected-flight artifact itself
-  as the source of pilot identity display (`R-META-15`). `(R-THREAT-08)`
+  as the source of pilot identity display (`20-artifacts.md §3.2`).
+  `(R-THREAT-08)`
 
 These controls are legal and compliance obligations on operators,
 not cryptographic guarantees. The protocol cannot prevent a
@@ -386,4 +387,3 @@ Mitigations:
   credentials. They do not alter pilot binding, ownership, or fetch rights.
 - Portals exposing a pilot-facing `did:web` alias SHOULD describe it as a public
   alias or mirror, not as the authoritative root identity.
-

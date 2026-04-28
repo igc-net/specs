@@ -11,14 +11,14 @@ Read in this order:
 2. `10-core.md` — hashes, signatures, canonical JSON, identity anchors
 3. `20-artifacts.md` — publication modes and sanitization
 4. `30-transport.md` — announcements, tickets, fetch rules
-5. `40-pilot-and-metadata.md` — profile VC authority, flight metadata, `igc-metadata`
+5. `40-pilot-and-metadata.md` — public metadata advertisements and portal namespaces
 6. `50-governance.md` — claims, approvals, challenges, resolutions
 7. `55-governance-sync.md` — governance propagation and catch-up
 8. `60-keys-and-access.md` — node categories, `private_access_keypair`,
    fetch authorization, rotation
 9. `65-pilot-auth-did.md` — canonical `did:key` pilot auth binding and rotation
 10. `70-durability.md` — deletion, archive, mode-upgrade obligations
-11. `80-analytics.md` — optional analytics extension
+11. `80-analytics.md` — deferred derived metadata and analytics boundary
 12. `90-conformance.md` — requirement labels and implementation profiles
 13. `92-threat-model.md` — threat and abuse model
 
@@ -33,8 +33,6 @@ Use these strings exactly:
 |---------|-------------------|
 | Governance topic ID | `igc-net/governance/v1` |
 | Announce topic ID | `igc-net/announce/v1` |
-| Analytics topic ID (optional) | `igc-net/analytics/v1` |
-
 Topic IDs are derived as `BLAKE3(UTF-8(input_string))[0..32]`, encoded as
 64-character lowercase hex.
 
@@ -70,12 +68,12 @@ Each pilot has three Ed25519 credential classes:
 
 | Key | Purpose |
 |-----|---------|
-| `pilot_id` root key | Signs pilot-authored governance and native metadata records (claims, publication-mode records, deletion requests, `flight-metadata`, `private-access-rotation-record`, `pilot-auth-did-record`). Does not rotate. |
-| `pilot_auth_did` | Wallet-held authentication / VC-issuer credential. In v0.3 this is the pilot's canonical `did:key`. It signs `PilotProfileCredential` and login challenges. |
-| `private_access_keypair` | Authorization credential for all non-public native content belonging to this pilot: signs fetch requests for private raw IGC, protected raw companions, private `flight-metadata`, and `igc-metadata`. MAY be rotated via `private-access-rotation-record` signed by `pilot_id`. |
+| `pilot_id` root key | Signs pilot-authored governance records (claims, publication-mode records, deletion requests, `private-access-rotation-record`, `pilot-auth-did-record`). Does not rotate. |
+| `pilot_auth_did` | Wallet-held authentication / VC-issuer credential. In v0.3 this is the pilot's canonical `did:key`; it signs login challenges and application-layer credentials. |
+| `private_access_keypair` | Authorization credential for pre-v0.5 non-public IGC content belonging to this pilot: signs fetch requests for private raw IGC and protected raw companions. MAY be rotated via `private-access-rotation-record` signed by `pilot_id`. |
 
-`PilotProfileCredential` is not a native fetch-gated metadata record. It is a
-VC-JWT presented by the wallet or a pilot-authorized sync service.
+Public metadata advertisements are signed by the publishing portal's `node_id`.
+They are discovery records, not fetch authorization.
 
 Serving nodes also have their own `node_id` Ed25519 keypairs (used to
 sign announcements and tickets); trusted resolvers have their own

@@ -18,7 +18,7 @@ This specification defines:
 - ownership claims and dispute resolution
 - permissioned federation governance
 - private access proof and key exchange
-- protected and private metadata handling
+- lightweight public metadata advertisements
 - transport-layer confidentiality dependency on iroh
 - publication mode changes and access grant revocation
 - erasure and deletion semantics
@@ -86,7 +86,7 @@ Ed25519 keypair.
 
 | Role | Identifier | Purpose |
 |------|-----------|---------|
-| Pilot | `pilot_id` | Authors flights, signs claims and metadata |
+| Pilot | `pilot_id` | Authors flights and signs pilot-authored governance records |
 | Serving node | `node_id` | Signs announcements and fetch tickets |
 | Trusted resolver | `resolver_id` | Signs approvals, challenges, and resolutions |
 
@@ -113,7 +113,7 @@ not governance claim types.
 | Category | Description |
 |----------|-------------|
 | Identity-linked node (Category 1) | Knows the pilot's `pilot_id`. May discover, fetch, serve, and index the pilot's `public` and `protected` artifacts. Does NOT hold the pilot's `private_access_keypair`. MUST NOT access private content or personal-identity fields. |
-| Private-access node (Category 2) | All capabilities of Category 1 plus holds the pilot's `private_access_keypair`. May sign fetch requests for the pilot's private content and private metadata records. |
+| Private-access node (Category 2) | All capabilities of Category 1 plus holds the pilot's `private_access_keypair`. May sign fetch requests for the pilot's private raw IGC and protected raw companions. |
 
 Full definitions are in `60-keys-and-access.md §2`.
 
@@ -131,9 +131,10 @@ across all normative documents.
 `raw_igc_hash` — computed as `BLAKE3(raw_igc_bytes)`.
 
 The identity anchor uniquely identifies a flight across the entire network. It is
-immutable once computed. All subsequent records (claims, artifacts, metadata,
-governance records) reference this anchor. Two portals independently receiving
-the same IGC file bytes will compute the same `raw_igc_hash`.
+immutable once computed. All subsequent flight-scoped records (claims,
+artifacts, metadata advertisements, governance records) reference this anchor.
+Two portals independently receiving the same IGC file bytes will compute the
+same `raw_igc_hash`.
 
 ### Artifact identity
 
@@ -168,13 +169,12 @@ state and key-possession proof.
 | `pilot_auth_did` | Pilot's rotatable authentication / VC-issuer DID, bound authoritatively to `pilot_id` by `pilot-auth-did-record` |
 | `node_id` | Serving node Ed25519 keypair identity |
 | `resolver_id` | Trusted resolver Ed25519 keypair identity |
-| `private_access_keypair` | Pilot's Ed25519 keypair used to authorize fetch requests for non-public content (private raw IGC, protected raw companion, private metadata records, igc-metadata). Single credential covering all non-public content. |
+| `private_access_keypair` | Pilot's Ed25519 keypair used to authorize fetch requests for pre-v0.5 non-public IGC content (private raw IGC and protected raw companion). |
 | `private_access_public_key` | Public half of `private_access_keypair`, published via `private-access-rotation-record` on the governance topic |
-| `PilotProfileCredential` | Self-issued VC-JWT carrying authoritative identity-level pilot profile fields |
+| `metadata-advertisement` | Public portal-defined advertisement for metadata or derived resources associated with igc-net identifiers |
 | identity-linked node (Category 1) | Node that knows a pilot's `pilot_id` but does NOT hold the pilot's `private_access_keypair`; may serve `public` and `protected` artifacts only |
 | private-access node (Category 2) | Node that holds a pilot's `private_access_keypair`; may sign fetch requests for the pilot's non-public content |
 | `publication_mode` | Artifact access state: `public`, `protected`, or `private` |
-| `visibility` | Metadata record privacy state: controls who may read a metadata record |
 | ticket | Locator encoding a serving node endpoint and blob identifier |
 | claim | Governance record asserting pilot ownership of a `raw_igc_hash` |
 | approval | Resolver record accepting a claim |
@@ -186,15 +186,19 @@ state and key-possession proof.
 | canonical JSON | RFC 8785 serialisation used for signing and record-ID computation |
 | `record_id` | `BLAKE3(canonical_json(record_without_signature))` |
 
-`publication_mode` and `visibility` must not be used interchangeably.
-`publication_mode` is a property of an artifact's access state.
-`visibility` is a property of a metadata record's privacy state.
+`publication_mode` governs artifact access state. Metadata advertisements are
+always public and do not grant access to referenced protected or private
+resources.
 
 ---
 
 ## 7. Document set
 
-The normative specification consists of thirteen documents.
+The normative specification consists of the numbered documents below plus the
+igc-net gRPC/protobuf contracts under `proto/` when service behavior is in
+scope. Examples inside these documents are non-normative unless explicitly
+stated otherwise. During the v0.3 draft period, `proto/` evolves in place and
+breaking changes are allowed until a stable public release.
 
 | # | File | Purpose | Depends on |
 |---|------|---------|-----------|
@@ -202,13 +206,13 @@ The normative specification consists of thirteen documents.
 | 10 | `10-core.md` | Cryptographic primitives, identity anchors, canonical form | 00 |
 | 20 | `20-artifacts.md` | Publication modes, sanitization algorithm, artifact relations | 10 |
 | 30 | `30-transport.md` | Announce topics, wire format, deduplication, fetch rules | 10, 20 |
-| 40 | `40-pilot-and-metadata.md` | Profile VC authority, flight metadata, igc metadata | 10 |
-| 50 | `50-governance.md` | Claim, approval, challenge, resolution, mode-change, deletion | 20, 40 |
+| 40 | `40-pilot-and-metadata.md` | Public metadata advertisements and portal namespaces | 10, 20, 30 |
+| 50 | `50-governance.md` | Claim, approval, challenge, resolution, mode-change, deletion | 20 |
 | 55 | `55-governance-sync.md` | Governance topic, propagation, ordering, catch-up | 50 |
 | 60 | `60-keys-and-access.md` | Node access categories, `private_access_keypair`, fetch authorization, rotation | 50 |
 | 65 | `65-pilot-auth-did.md` | Authentication DID binding and rotation | 10, 50, 55, 60 |
 | 70 | `70-durability.md` | Durability obligations, archive custody, deletion enforcement | 60 |
-| 80 | `80-analytics.md` | Optional analytics exchange model | 10, 20, 30 |
+| 80 | `80-analytics.md` | Deferred derived metadata and analytics boundary | 40 |
 | 90 | `90-conformance.md` | Requirement IDs, conformance profiles, cross-document invariants | all |
 | 92 | `92-threat-model.md` | Threat and abuse model for the identity and governance surface | 00, 10, 20, 30, 50, 55, 60, 65, 70 |
 
@@ -222,24 +226,25 @@ The normative specification consists of thirteen documents.
  10-core
      |
  20-artifacts
-    /        \
-30-transport  40-pilot-and-metadata
-                        |
-                  50-governance
-                        |
-               55-governance-sync
-                        |
-               60-keys-and-access
-                    /         \
+    |
+30-transport
+    |
+  50-governance
+    |
+55-governance-sync
+    |
+60-keys-and-access
+    /         \
 65-pilot-auth-did              70-durability
 
-80-analytics  ← depends on 10-core, 20-artifacts, 30-transport
+40-pilot-and-metadata ← depends on 10-core, 20-artifacts, 30-transport
+80-analytics  ← depends on 40-pilot-and-metadata
 90-conformance ← depends on all normative documents
 92-threat-model ← depends on the core and identity docs
 ```
 
 Reading order for implementers: 00 → 10 → 20 → 30 → 40 → 50 → 55 → 60 → 65 → 70.
-Read 80 only if implementing the analytics extension.
+Read 80 for the derived metadata and analytics boundary.
 Read 90 for conformance mapping.
 Read 92 for the threat and abuse model.
 

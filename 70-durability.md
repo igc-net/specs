@@ -40,9 +40,9 @@ explicitly approve a durability node by granting it the
 
 A durability node that holds `private_access_keypair`:
 
-- Stores plaintext private raw IGC bytes and plaintext private metadata
-  records it has fetched. No protocol-level content encryption is applied;
-  iroh's transport encryption protects bytes in flight only.
+- Stores plaintext private raw IGC bytes it has fetched. No protocol-level
+  content encryption is applied; iroh's transport encryption protects bytes in
+  flight only.
 - Keeps that plaintext content confidential as a **compliance and legal
   obligation** on its terms of service. The protocol does not enforce
   confidentiality at rest cryptographically.
@@ -78,7 +78,10 @@ immediately `(R-DUR-03)`; MUST NOT wait for a cache TTL `(R-DUR-04)`.
 ### 2.3 After `private_access_keypair` deletion
 
 See `60-keys-and-access.md §7`. Delete the keypair `(R-DUR-05)` and stop
-serving all non-public content for that pilot `(R-DUR-06)`.
+serving all non-public content for that pilot `(R-DUR-06)`. Also delete
+locally held protected raw companion and private raw IGC plaintext unless a
+separate active durability custody grant explicitly authorizes retention.
+`(R-DUR-12)`
 
 ### 2.4 After processing a `private-access-rotation-record`
 
@@ -117,6 +120,6 @@ regardless of non-compliant peers.
 |-------|---------------------|------------------|
 | Deletion request received | Stop serving all artifacts for hash | Remove flight-scoped records and indexes |
 | Mode upgrade record received | Stop serving previously permitted artifact | — |
-| `private_access_keypair` deleted at node | Stop serving non-public content for that pilot | Delete bytes if deletion request also issued |
+| `private_access_keypair` deleted at node | Stop serving non-public content for that pilot; delete key material | Delete restricted plaintext unless a separate active durability custody grant authorizes retention |
 | `private-access-rotation-record` processed with non-matching key | Stop signing or honoring signatures under the old key | — |
 | Challenge record received | Freeze non-public release for hash | — |

@@ -1,391 +1,208 @@
-# igc-net — Pilot Profile and Metadata
+# igc-net — Public Metadata Advertisements
 
 **Status:** Normative  
-**Depends on:** `10-core.md`
+**Depends on:** `10-core.md`, `20-artifacts.md`, `30-transport.md`
 
 ---
 
-## 1. Authority model
+## 1. Scope
 
-This specification defines two native metadata record types and one VC-based profile authority:
+igc-net does not standardize native pilot metadata, native flight metadata,
+IGC-derived provenance records, metadata merge rules, or analytics semantics in
+the pre-v0.5 baseline.
 
-```text
-PilotProfileCredential = authoritative identity-level pilot profile data
-flight-metadata        = authoritative accepted-owner-signed flight data
-igc-metadata           = private source-observed provenance (never authoritative)
-```
+The only metadata-plane object in this baseline is a lightweight public
+**metadata advertisement**. It lets a portal announce that it has portal-defined
+metadata or derived resources associated with one or more public igc-net
+identifiers. The network provides discovery, attribution, and namespace
+recognition only.
 
-`igc-metadata` records what was observed in the uploaded IGC file. It is never
-authoritative over `PilotProfileCredential` or `flight-metadata`. The
-distinction between source-observed provenance, pilot-authored authoritative
-flight metadata, and VC-based profile presentation is fundamental to the
-identity model.
+Metadata advertisements are not:
 
-`flight-metadata` and `igc-metadata` are native `igc-net` JSON records. They
-are stored and served as plaintext JSON over the protocol.
-
-`PilotProfileCredential` is different:
-
-- it is a self-issued VC-JWT, not a native governance record
-- it is presented at the application layer by the pilot's wallet or by a
-  pilot-authorized sync service
-- it is not broadcast on the governance topic or the announce topic
-- it is not fetched via `fetch-request`
-
-No protocol-level content encryption is applied to native metadata; see
-`10-core.md §1.3`.
-
----
-
-## 2. Pilot profile authority
-
-### 2.1 Authoritative object
-
-The authoritative identity-level pilot profile object is
-`PilotProfileCredential`, a self-issued VC-JWT signed by the pilot's currently
-active `pilot_auth_did`.
-
-The native `pilot-profile` record from prior versions is removed as a live
-authority. An implementation MUST NOT treat a native `pilot-profile` JSON
-record as the authoritative source of profile fields. `(R-META-01)`
-
-`PilotProfileCredential` is authoritative for pilot profile display fields only.
-It is not authoritative for:
-
-- ownership or accepted-owner status
-- publication mode
+- ownership claims
+- publication-mode records
 - fetch authorization
-- governance topic state
-- flight-scoped metadata such as wing or equipment data
+- pilot profile authority
+- standardized thermal, wind, scoring, replay, or analytics schemas
+- evidence that a referenced resource is public-fetchable
 
-### 2.2 Required VC-JWT shape
-
-The minimal `PilotProfileCredential` profile is:
-
-- JOSE header:
-  - `alg` MUST be `"EdDSA"`
-  - `typ` MUST be `"vc+jwt"`
-  - `kid` MUST identify the verification method of the issuer DID
-
-- JWT claims:
-  - `iss` MUST be the pilot's currently active `pilot_auth_did`
-  - `sub` MUST be the pilot's `pilot_id`
-  - `iat` MUST be present
-  - `nbf` MUST be present
-  - `jti` MUST be present
-  - `vc` MUST be present
-
-- `vc` object:
-  - `@context` MUST include `"https://www.w3.org/2018/credentials/v1"`
-  - `type` MUST include `"VerifiableCredential"`
-  - `type` MUST include `"PilotProfileCredential"`
-  - `credentialSubject.id` MUST equal `sub`
-  - `credentialSubject.pilot_auth_did` MUST equal `iss`
-  - `credentialSubject.country`, if present, MUST use ISO 3166-1 alpha-2
-
-Profile fields such as display name and country live inside
-`vc.credentialSubject`. Flight-level metadata does not belong in this VC.
-
-### 2.3 Verification rules
-
-A portal or relying party MUST perform all of the following before treating a
-presented `PilotProfileCredential` as authoritative: `(R-META-02)`
-
-1. Decode the compact JWT and reject malformed input.
-2. Verify `alg = "EdDSA"` and `typ = "vc+jwt"`.
-3. Resolve `iss` as a DID of an accepted pilot authentication method. The
-   required portable pilot method is `did:key`; other pilot-held methods are
-   not authoritative unless explicitly admitted by `65-pilot-auth-did.md`.
-4. Verify the JOSE signature using the public key resolved from `iss`.
-5. Read `sub` and confirm it is a syntactically valid `pilot_id`.
-6. Fetch or consult the authoritative `pilot-auth-did-record` chain for `sub`
-   and confirm the currently active `pilot_auth_did` equals `iss`.
-7. Confirm `credentialSubject.id = sub`.
-8. Confirm `credentialSubject.pilot_auth_did = iss`.
-
-If Step 6 fails because no authoritative `pilot-auth-did-record` is available
-for `sub`, the VC MUST NOT be treated as authoritative. `(R-META-03)`
-
-If the VC is cryptographically valid but `iss` no longer matches the currently
-active `pilot_auth_did` for `sub`, the VC is stale and MUST NOT be treated as
-authoritative. `(R-META-04)`
-
-If a portal displays fields from a VC that failed any of the checks above for
-debugging or audit purposes, it MUST label those fields as non-authoritative.
-
-### 2.4 Distribution and caching
-
-`PilotProfileCredential` is distributed outside the native transport plane:
-
-- the pilot's wallet MAY present it directly to a portal during authentication
-  or profile-sharing flows
-- a pilot-authorized sync endpoint MAY serve it to portals outside the native
-  `igc-net` fetch-request mechanism
-
-`PilotProfileCredential` MUST NOT be embedded in:
-
-- governance records
-- announce-topic records
-- `pilot-auth-did-record`
-- `fetch-request`
-
-Portals MAY cache the latest verified `PilotProfileCredential` they have
-received for a given `pilot_id`.
-
-A cached VC becomes stale if either of the following occurs:
-
-- the portal receives a newer verified profile VC for the same `pilot_id`
-- the portal processes a `pilot-auth-did-record` that changes the active
-  `pilot_auth_did` for that `pilot_id`
-
-A portal that detects either condition MUST stop treating the older cached VC as
-authoritative until a fresh VC is verified. `(R-META-05)`
-
-There is no `supersedes` chain for profile VCs. Operationally, the latest
-verified non-stale VC replaces the older one.
+`PilotProfileCredential` remains an application-layer credential presented by a
+pilot wallet or portal-local account flow. It is not a native metadata
+advertisement and is not fetched through the igc-net artifact fetch mechanism.
+Pilot authentication DID binding is defined in `65-pilot-auth-did.md`.
 
 ---
 
-## 3. Flight metadata
+## 2. Public-only rule
 
-`flight-metadata` is accepted-owner-signed metadata about wings and similar
-flight-level data. It uses two scopes: `"default"` and `"flight"`.
+Metadata advertisements are always public. `(R-META-01)`
 
-### 3.1 Default scope
+A portal MUST NOT put confidential, private, or access-controlled data directly
+inside a metadata advertisement. `(R-META-02)`
 
-The `default` scope applies to all flights for this pilot unless overridden by a
-`flight`-scope record.
+Advertisements MAY refer to other resources. Those resources MAY be public,
+protected, private, or portal-local, but access to a referenced resource is
+governed by that resource's own access policy, not by the advertisement.
+`(R-META-03)`
 
-```json
-{
-  "schema": "igc-net/flight-metadata",
-  "schema_version": 1,
-  "record_id": "<blake3-of-canonical-record-without-signature>",
-  "pilot_id": "igcnet:id:<root-public-key-hex>",
-  "scope": "default",
-  "raw_igc_hashes": [],
-  "wing_manufacturer": "Ozone",
-  "wing_model": "Alpina 4",
-  "wing_class_en": "CCC",
-  "visibility": "private",
-  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "supersedes": null,
-  "signature": "<ed25519-signature-hex>"
-}
-```
+Public identifiers are not private in igc-net. In particular, `raw_igc_hash`,
+`protected_hash`, portal namespaces, and public resource identifiers MAY appear
+in public advertisements even when the referenced artifact or resource is
+protected or private. `(R-META-04)`
 
-`raw_igc_hashes` MUST be empty for `scope: "default"`.
+Derived metadata can still reveal sensitive information. The publishing portal
+is responsible for deciding whether a derived value is safe to advertise
+publicly. igc-net does not guarantee that a metadata advertisement is
+non-sensitive merely because the advertisement is syntactically valid.
+`(R-META-05)`
 
-### 3.2 Flight scope
+---
 
-The `flight` scope applies to a specific set of `raw_igc_hash` values,
-representing one logical flight unit (for example, multiple IGC files from the
-same recorder session).
+## 3. Advertisement record
+
+Metadata advertisements are native signed JSON records broadcast on the
+data-plane announce topic. They use the same canonical JSON, `record_id`, and
+signature rules as other native signed records.
+
+### 3.1 Shape
 
 ```json
 {
-  "schema": "igc-net/flight-metadata",
+  "schema": "igc-net/metadata-advertisement",
   "schema_version": 1,
   "record_id": "<blake3-of-canonical-record-without-signature>",
-  "pilot_id": "igcnet:id:<root-public-key-hex>",
-  "scope": "flight",
-  "raw_igc_hashes": [
-    "<blake3-hex-a>",
-    "<blake3-hex-b>"
+  "portal_namespace": "org.example.portal",
+  "advertisement_type": "org.example.portal.thermals",
+  "raw_igc_hashes": ["<blake3-hex>", "..."],
+  "resource_refs": [
+    {
+      "uri": "https://portal.example.org/flights/<id>/thermals.json",
+      "access": "public|protected|private|portal-local",
+      "media_type": "application/json"
+    }
   ],
-  "wing_manufacturer": "Advance",
-  "wing_model": "Sigma DLS",
-  "wing_class_en": "C",
-  "visibility": "private",
-  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "supersedes": null,
-  "signature": "<ed25519-signature-hex>"
-}
-```
-
-`raw_igc_hashes` MUST be non-empty for `scope: "flight"`.
-
-### 3.3 Rules for all `flight-metadata` records
-
-- Signed by the pilot's root identity key (`pilot_id`).
-- A compliant node MUST reject a `flight-metadata` record where `pilot_id` does
-  not match the accepted owner for all listed `raw_igc_hash` values.
-- `visibility` default: `"private"`. Values: `"public"` or `"private"`.
-- Every `raw_igc_hash` listed in `raw_igc_hashes` MUST already be owned by the
-  same accepted owner.
-- At most one active `scope: "default"` record per `pilot_id` at any time.
-  `(R-META-06)`
-- For any given `raw_igc_hash`, at most one active `scope: "flight"` record may
-  apply at any time. `(R-META-07)`
-- Supersession is whole-record: a new record replaces the entire previous active
-  record. No field-level merge. `(R-META-08)`
-- Records with `visibility: "private"` are served only to requesters who
-  present a valid fetch request signed by the pilot's currently authorized
-  `private_access_keypair`. Bytes are served as plaintext; nodes holding the
-  record are bound by confidentiality obligations.
-
-### 3.4 Atomic supersession for flight-scope records
-
-When a `flight`-scope record is superseded: `(R-META-09)`
-
-- The old record's coverage ends atomically for all `raw_igc_hash` values it
-  listed.
-- `raw_igc_hash` values not covered by the new record fall back to the
-  `default`-scope record.
-- There is no partial or per-hash supersession. Either the entire old record is
-  superseded or none of it is.
-
----
-
-## 4. IGC metadata
-
-`igc-metadata` records source-observed provenance extracted from the raw uploaded
-IGC file. It is always private.
-
-### 4.1 Shape
-
-```json
-{
-  "schema": "igc-net/igc-metadata",
-  "schema_version": 1,
-  "record_id": "<blake3-of-canonical-record-without-signature>",
-  "raw_igc_hash": "<blake3-hex>",
-  "source_service": "xcontest",
-  "observed_full_name": "ALICE EXAMPLE",
-  "observed_glider_type": "Ozone Alpina 4",
-  "observed_glider_id": "D-1234",
-  "observed_comment": "",
+  "payload": {},
   "node_id": "<node-ed25519-public-key-hex>",
   "created_at": "YYYY-MM-DDTHH:MM:SSZ",
   "signature": "<ed25519-signature-hex>"
 }
 ```
 
-`node_id` identifies the uploading portal that created this record.
-`signature` is the Ed25519 signature over the RFC 8785 canonical JSON of all
-fields except `signature`, made with the uploading portal's `node_id` key. The
-signature binds the record's integrity and origin; a recipient MUST verify it
-before trusting the record's contents.
+### 3.2 Required fields
 
-### 4.2 Rules
+- `schema` MUST be exactly `"igc-net/metadata-advertisement"`.
+- `schema_version` MUST be `1` for this version.
+- `record_id = BLAKE3(canonical_json(record_without_signature))`.
+- `portal_namespace` identifies the portal-defined namespace. It MUST be a
+  non-empty lowercase ASCII namespace string controlled by the publishing portal.
+  Reverse-DNS naming is RECOMMENDED, for example `org.xcontest` or
+  `net.cloudstreet`. `(R-META-06)`
+- `advertisement_type` identifies the portal-defined advertisement kind. It
+  MUST be scoped under `portal_namespace` or use an `x-` prefixed experimental
+  namespace. `(R-META-07)`
+- `raw_igc_hashes` MAY be empty. If present, every value MUST be a lowercase
+  BLAKE3 hex hash.
+- `resource_refs` MAY be empty. If present, each entry is a locator or pointer,
+  not authorization.
+- `payload` MAY be any JSON object. Its structure is portal-defined.
+- `node_id` identifies the publishing portal/node.
+- `signature` MUST verify against `node_id`. `(R-META-08)`
 
-- Always private. There is no `visibility` field; `igc-metadata` MUST NOT be
-  served to any requester that does not present a valid fetch request signed by
-  the pilot's currently authorized `private_access_keypair`. `(R-META-10)`
-- Bytes are served as plaintext over iroh's encrypted transport; no
-  protocol-level content encryption is applied. Nodes holding `igc-metadata` are
-  bound by confidentiality obligations.
-- Provenance only. `igc-metadata` is NOT authoritative over
-  `PilotProfileCredential` or `flight-metadata` for any field.
-- MUST be signed by the uploading portal's `node_id` key.
-- Held by the uploading node (portal or pilot's self-hosted node).
-- The pilot operating a private-access node is always an authorized requester;
-  the holding node MUST serve `igc-metadata` to the pilot on demand when the
-  request is signed by the pilot's currently authorized `private_access_keypair`.
-- If the pilot operates a self-hosted node at upload time, the uploading portal
-  MUST replicate `igc-metadata` to that node at upload time. `(R-META-11)`
+### 3.3 Validation and handling
 
----
+A node receiving a metadata advertisement MUST validate `schema`,
+`schema_version`, `record_id`, `node_id`, `signature`, namespace fields, and hash
+formats before indexing it. Invalid advertisements MUST be dropped.
+`(R-META-09)`
 
-## 5. Precedence rules
+A node that does not recognize `portal_namespace` or `advertisement_type` MUST
+ignore the advertisement payload and MAY retain only minimal index information
+needed to show that the portal advertised metadata for the referenced hashes.
+Unknown namespaces MUST NOT cause fetch, governance, or publication-mode
+behavior to change. `(R-META-10)`
 
-When displaying metadata, portals MUST apply these precedence rules.
+Recognizing a namespace means only that the receiver knows how to interpret the
+portal-defined payload. It does not make the payload authoritative over igc-net
+identity, artifact hashes, publication modes, governance state, or access
+control. `(R-META-11)`
 
-**For wing and glider fields:**
-
-1. Latest active `flight-metadata(scope="flight")` covering the `raw_igc_hash`.
-2. Otherwise: latest active `flight-metadata(scope="default")` for the pilot.
-3. Otherwise: `igc-metadata` as provenance/fallback display source, clearly
-   labelled as observed provenance, not authoritative data.
-
-**For pilot identity fields:**
-
-1. Latest verified non-stale `PilotProfileCredential` for that `pilot_id`.
-2. Otherwise: `igc-metadata` as provenance/fallback display source, clearly
-   labelled as observed provenance, not authoritative data.
-
-`igc-metadata` MUST NOT silently replace authoritative pilot metadata.
+Metadata advertisements MUST NOT be broadcast on the governance topic.
 `(R-META-12)`
 
-If a portal displays values from `igc-metadata`, it MUST indicate to the user
-that the source is observed provenance, not the pilot's authoritative record.
-`(R-META-13)`
+---
+
+## 4. Resource references
+
+`resource_refs` are pointers. They do not grant access and they do not imply
+that igc-net can fetch the referenced resource. `(R-META-13)`
+
+The `access` field is advisory and describes the publishing portal's intended
+access policy for the referenced resource:
+
+| Value | Meaning |
+|-------|---------|
+| `public` | The portal expects the resource to be publicly reachable. |
+| `protected` | The portal expects some non-igc-net or future igc-net access rule. |
+| `private` | The portal expects explicit pilot/portal authorization. |
+| `portal-local` | The resource is meaningful only within the publishing portal. |
+
+For pre-v0.5, igc-net defines no standard fetch path for advertisement
+resources. A portal that follows a `resource_ref` uses portal-specific policy
+and transport outside the core artifact fetch rules. `(R-META-14)`
 
 ---
 
-## 6. Visibility defaults for native metadata
+## 5. Examples
 
-`visibility` applies only to native metadata records.
+The following are examples only. They are not standardized payload schemas and
+they are not conformance requirements.
 
-| Object | Default visibility | Visibility field? |
-|--------|--------------------|------------------|
-| `PilotProfileCredential` | Not a native visibility-controlled record | No |
-| `flight-metadata` | `"private"` | Yes |
-| `igc-metadata` | Always private | No |
+### 5.1 Thermal annotations
 
-Semantics of `visibility: "private"`: the record is served only to requesters
-who present a valid fetch request signed by the pilot's currently authorized
-`private_access_keypair`. The record itself is stored and transmitted as
-plaintext. `(R-META-14)`
+```json
+{
+  "schema": "igc-net/metadata-advertisement",
+  "schema_version": 1,
+  "record_id": "<blake3-of-canonical-record-without-signature>",
+  "portal_namespace": "org.example.portal",
+  "advertisement_type": "org.example.portal.thermals",
+  "raw_igc_hashes": ["<blake3-hex>"],
+  "resource_refs": [
+    {
+      "uri": "https://portal.example.org/derived/<hash>/thermals.json",
+      "access": "public",
+      "media_type": "application/json"
+    }
+  ],
+  "payload": {
+    "summary": "thermal annotations available"
+  },
+  "node_id": "<node-ed25519-public-key-hex>",
+  "created_at": "2026-05-01T12:00:00Z",
+  "signature": "<ed25519-signature-hex>"
+}
+```
 
-`PilotProfileCredential` privacy is determined by pilot presentation and
-portal-side policy outside the native fetch-request mechanism. It is not a
-governance-controlled protocol object.
+### 5.2 Wind estimates
 
----
+```json
+{
+  "schema": "igc-net/metadata-advertisement",
+  "schema_version": 1,
+  "record_id": "<blake3-of-canonical-record-without-signature>",
+  "portal_namespace": "org.example.portal",
+  "advertisement_type": "org.example.portal.wind",
+  "raw_igc_hashes": ["<blake3-hex>"],
+  "resource_refs": [],
+  "payload": {
+    "summary": "wind estimate available"
+  },
+  "node_id": "<node-ed25519-public-key-hex>",
+  "created_at": "2026-05-01T12:00:00Z",
+  "signature": "<ed25519-signature-hex>"
+}
+```
 
-## 7. Portal-local display rules
-
-### 7.1 Identity display rule `(R-META-15)`
-
-The sanitized public artifact for a `protected` flight MUST NOT carry pilot
-identity.
-
-A portal MAY display pilot identity alongside a protected flight only if:
-
-- the pilot is the locally authenticated account user on that portal, or
-- the portal has a latest verified non-stale `PilotProfileCredential` for that
-  pilot
-
-The source of any displayed pilot identity MUST NOT be the sanitized artifact
-itself. It MUST be a separate authoritative or clearly-labelled provenance
-source.
-
-### 7.2 Permission-loss obligation
-
-If a portal loses authority to read private native metadata records, it MUST
-immediately stop using cached copies of those private native records for display
-or further processing. `(R-META-16)`
-
-This applies to:
-
-- private `flight-metadata` records
-- `igc-metadata`
-
-`PilotProfileCredential` does not follow `private_access_keypair` authorization.
-Its validity instead follows the verification and staleness rules in §2.
-
----
-
-## 8. Storage model for protected and private uploads
-
-For `protected` uploads, a private-access portal holds:
-
-1. The sanitized public artifact (plaintext `.igc`).
-2. The raw IGC companion (plaintext `.igc`), access-gated by fetch-request
-   signature.
-3. The private `igc-metadata` record (plaintext JSON, access-gated).
-4. The pilot's `flight-metadata` records as separate signed native JSON records
-   (access-gated when `visibility: "private"`).
-5. Optionally, the latest verified `PilotProfileCredential` cache for that pilot
-   if it has been separately presented to the portal by the wallet or by a
-   pilot-authorized sync channel.
-
-For `private` uploads, a private-access portal holds the raw IGC bytes
-(plaintext) plus the same metadata objects as above. All native non-public
-content is access-gated by fetch-request signature.
-
-The sanitized public artifact contains public-safe flight data only. The raw
-companion and the private-mode raw IGC preserve exact provenance and future
-reparsing capability. Confidentiality of stored plaintext native content is a
-compliance and legal obligation on the portal operator.
+Future versions may standardize thermal, wind, scoring, replay, or other
+derived-data schemas if operational practice converges. Until then, portals use
+their own namespaces and receivers treat payloads as portal-defined data.

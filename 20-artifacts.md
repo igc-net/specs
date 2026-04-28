@@ -12,8 +12,8 @@ artifact access state for that flight: which byte artifacts exist, who may
 fetch them, and whether a fetch requires authorization.
 
 `publication_mode` is a property of artifact access state. It must not be
-confused with `visibility`, which is a property of metadata record privacy
-state (defined in `40-pilot-and-metadata.md`).
+confused with public metadata advertisements, which may point to resources but
+do not grant access to artifacts or referenced resources.
 
 The three modes are:
 
@@ -26,6 +26,46 @@ The three modes are:
 All bytes are stored and served as plaintext. No protocol-level content
 encryption is applied; see `10-core.md §1.3` for the transport and at-rest
 confidentiality model.
+
+## 1.1 Artifact-class serving matrix
+
+Serving decisions are made against the current effective governance state and
+the current effective `publication_mode` for `raw_igc_hash`. A node MUST NOT
+serve an artifact class that is not allowed by the current mode. `(R-ART-17)`
+
+| Requested artifact class | Current mode required | Authorization required | Bytes returned |
+|--------------------------|-----------------------|------------------------|----------------|
+| `public_raw_igc` | `public` | none | original raw IGC bytes |
+| `protected_sanitized_igc` | `protected` | none | sanitized IGC bytes whose hash is `protected_hash` |
+| `protected_raw_companion` | `protected` | valid restricted fetch request | original raw IGC bytes |
+| `private_raw_igc` | `private` | valid restricted fetch request | original raw IGC bytes |
+
+A valid deletion request, `contested` state, or `rejected` state forbids serving
+all artifact classes for the affected `raw_igc_hash`. `(R-ART-18)`
+
+If governance state, publication-mode state, or a required supersession chain is
+stale or incomplete for the requested `raw_igc_hash`, the node MUST fail closed
+for that fetch. `(R-ART-19)`
+
+The serving node MUST verify artifact bytes before transmitting them:
+
+- `public_raw_igc`, `protected_raw_companion`, and `private_raw_igc` bytes MUST
+  hash to `raw_igc_hash`.
+- `protected_sanitized_igc` bytes MUST hash to the current effective
+  `protected_hash`.
+
+If the hash check fails, the node MUST refuse the fetch. `(R-ART-20)`
+
+For `protected` mode, the sanitized artifact and raw companion are distinct
+artifact classes even though they derive from the same raw IGC bytes. A request
+for `protected_sanitized_igc` MUST NOT return the raw companion, and a request
+for `protected_raw_companion` MUST NOT return the sanitized artifact.
+`(R-ART-21)`
+
+For `public` mode, a node MAY continue to expose a previously computed
+sanitized derivative outside the normative artifact-fetch surface, but it is
+not the current `protected_sanitized_igc` artifact and MUST NOT replace the
+public raw IGC as the mode's canonical artifact. `(R-ART-22)`
 
 ---
 
@@ -125,10 +165,9 @@ A portal MAY display pilot identity alongside a protected flight ONLY if:
   portal that authored the original upload.
 
 The source of any displayed pilot identity MUST NOT be the sanitized
-artifact itself. It MUST be an authorized separate record (a
-`visibility: "private"` record accessed under the pilot's own
-`private_access_keypair`, or a `visibility: "public"` record the pilot has
-published).
+artifact itself. It MUST be an authorized separate source outside the
+sanitized artifact, such as a portal-local account/profile assertion or a
+pilot-presented credential.
 
 ---
 

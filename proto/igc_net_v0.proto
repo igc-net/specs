@@ -1,0 +1,171 @@
+syntax = "proto3";
+
+package igc_net.v0;
+
+// Normative draft igc-net gRPC API for the v0.3 migration.
+//
+// The v0 package is intentionally unstable. Breaking changes are allowed while
+// the protocol is in draft.
+
+service IgcNet {
+  rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse);
+  rpc PublishFlight(PublishFlightRequest) returns (PublishFlightResponse);
+  rpc FetchArtifact(FetchArtifactRequest) returns (FetchArtifactResponse);
+  rpc QueryIndex(QueryIndexRequest) returns (QueryIndexResponse);
+  rpc SubscribeEvents(SubscribeEventsRequest) returns (stream IgcNetEvent);
+
+  // Portal-mediated handover into igc-net private-access custody.
+  rpc ProvisionPrivateAccessKey(ProvisionPrivateAccessKeyRequest)
+      returns (ProvisionPrivateAccessKeyResponse);
+  rpc RevokePrivateAccess(RevokePrivateAccessRequest)
+      returns (RevokePrivateAccessResponse);
+}
+
+// RPC failures are returned as non-OK gRPC statuses. Implementations SHOULD
+// attach or expose one of these reasons in generated-client-specific error
+// detail mechanisms.
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+  ERROR_REASON_NODE_NOT_READY = 1;
+  ERROR_REASON_GOVERNANCE_STALE = 2;
+  ERROR_REASON_CONTESTED = 3;
+  ERROR_REASON_REJECTED = 4;
+  ERROR_REASON_DELETED = 5;
+  ERROR_REASON_UNAUTHORIZED = 6;
+  ERROR_REASON_MISSING_PRIVATE_ACCESS_KEY = 7;
+  ERROR_REASON_ROTATED_KEY = 8;
+  ERROR_REASON_MISSING_BLOB = 9;
+  ERROR_REASON_INVALID_ARGUMENT = 10;
+  ERROR_REASON_INTERNAL = 11;
+  ERROR_REASON_MISSING_GOVERNANCE_BASELINE = 12;
+  ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD = 13;
+  ERROR_REASON_ARTIFACT_CLASS_NOT_ALLOWED = 14;
+}
+
+message GetNodeStatusRequest {}
+
+message GetNodeStatusResponse {
+  string protocol_version = 1;
+  string api_version = 2;
+  string node_id = 3;
+  bool ready = 4;
+  GovernanceSyncState governance_sync_state = 5;
+  uint64 latest_event_seq = 6;
+  bool governance_baseline_ready = 7;
+}
+
+enum GovernanceSyncState {
+  GOVERNANCE_SYNC_STATE_UNSPECIFIED = 0;
+  GOVERNANCE_SYNC_STATE_NOT_STARTED = 1;
+  GOVERNANCE_SYNC_STATE_CATCHING_UP = 2;
+  GOVERNANCE_SYNC_STATE_READY = 3;
+  GOVERNANCE_SYNC_STATE_STALE = 4;
+  GOVERNANCE_SYNC_STATE_FAILED = 5;
+}
+
+message PublishFlightRequest {
+  bytes raw_igc = 1;
+  string filename = 2;
+  PublicationMode publication_mode = 3;
+}
+
+message PublishFlightResponse {
+  string raw_igc_hash = 1;
+  string protected_hash = 2;
+  repeated string tickets = 3;
+  repeated string companion_tickets = 4;
+}
+
+enum PublicationMode {
+  PUBLICATION_MODE_UNSPECIFIED = 0;
+  PUBLICATION_MODE_PUBLIC = 1;
+  PUBLICATION_MODE_PROTECTED = 2;
+  PUBLICATION_MODE_PRIVATE = 3;
+}
+
+message FetchArtifactRequest {
+  string raw_igc_hash = 1;
+  ArtifactClass artifact_class = 2;
+  // Required for restricted artifact classes (protected_raw_companion, private_raw_igc).
+  // Signed over RFC-8785 canonical JSON of fields 1-4 using private_access_keypair.
+  string requester_key = 3;  // ed25519 public key, lowercase hex
+  uint64 seq_num = 4;        // monotonic counter; must exceed server's last-seen for requester_key
+  bytes  signature = 5;      // ed25519 signature over canonical JSON of fields 1-4
+}
+
+message FetchArtifactResponse {
+  bytes artifact_bytes = 1;
+  string artifact_hash = 2;
+}
+
+enum ArtifactClass {
+  ARTIFACT_CLASS_UNSPECIFIED = 0;
+  ARTIFACT_CLASS_PUBLIC_RAW_IGC = 1;
+  ARTIFACT_CLASS_PROTECTED_SANITIZED_IGC = 2;
+  ARTIFACT_CLASS_PROTECTED_RAW_COMPANION = 3;
+  ARTIFACT_CLASS_PRIVATE_RAW_IGC = 4;
+}
+
+message QueryIndexRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+}
+
+message QueryIndexResponse {
+  repeated IndexEntry entries = 1;
+  string next_page_token = 2;
+}
+
+message IndexEntry {
+  string raw_igc_hash = 1;
+  PublicationMode publication_mode = 2;
+  string protected_hash = 3;
+  repeated string serving_node_ids = 4;
+}
+
+message SubscribeEventsRequest {
+  // 0-based event sequence. Delivery is at-least-once.
+  uint64 from_seq = 1;
+}
+
+message IgcNetEvent {
+  uint64 seq = 1;
+  EventKind kind = 2;
+  IndexEntry entry = 3;
+}
+
+enum EventKind {
+  EVENT_KIND_UNSPECIFIED = 0;
+  EVENT_KIND_LOCAL_PUBLISH = 1;
+  EVENT_KIND_REMOTE_ANNOUNCEMENT = 2;
+  EVENT_KIND_GOVERNANCE_UPDATE = 3;
+}
+
+message ProvisionPrivateAccessKeyRequest {
+  string pilot_id = 1;
+  // 32-byte Ed25519 seed for the pilot's private_access_keypair.
+  bytes private_access_secret_key = 2;
+  // Portal's view of the current active private_access_public_key. igc-net
+  // validates this lowercase-hex public key against both the supplied secret
+  // key and governance state.
+  string expected_private_access_public_key = 3;
+}
+
+message ProvisionPrivateAccessKeyResponse {
+  string pilot_id = 1;
+  string private_access_public_key = 2;
+  bool full_governance_catchup_required = 3;
+  GovernanceSyncState pilot_governance_sync_state = 4;
+  bool restricted_serving_ready = 5;
+}
+
+message RevokePrivateAccessRequest {
+  string pilot_id = 1;
+}
+
+message RevokePrivateAccessResponse {
+  string pilot_id = 1;
+  bool key_deleted = 2;
+  bool restricted_plaintext_deleted = 3;
+  bool tombstone_retained = 4;
+}

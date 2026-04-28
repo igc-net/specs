@@ -14,13 +14,12 @@ igc-net distinguishes two independent access concerns:
    corresponds to, and can therefore discover, serve, and group that pilot's
    `public` and `protected` artifacts under the right identity.
 2. **Private access** — a node holds a key that lets it authorize fetches for
-   that pilot's non-public content: private IGC files, the raw companion that
-   backs a protected flight, and any metadata record whose `visibility` is
-   `"private"` (including `igc-metadata`).
+   that pilot's non-public IGC content: private raw IGC files and the raw
+   companion that backs a protected flight.
 
 The protocol represents private access with a single **`private_access_keypair`**
 per pilot. Possession of this keypair is the sole authorization credential for
-all non-public content of that pilot. There are no separate per-content-type
+all pre-v0.5 non-public IGC content of that pilot. There are no separate per-content-type
 keys.
 
 igc-net does not perform protocol-level content encryption; see
@@ -50,8 +49,8 @@ An identity-linked node:
 - MUST NOT fetch private-mode raw IGC bytes for that pilot.
 - MUST NOT fetch the raw companion bound to a `protected` flight of that
   pilot.
-- MUST NOT fetch, decrypt, store, index, or display any private native metadata
-  object belonging to that pilot (`flight-metadata`, `igc-metadata`).
+- MUST NOT treat public metadata advertisements as authorization to fetch
+  non-public IGC bytes or portal-hosted protected/private resources.
   `(R-ACCESS-02)`
 - MUST NOT display personal-identity fields (name, surname, nationality,
   wing, competitions, etc.) for that pilot unless the portal has a separately
@@ -72,8 +71,7 @@ A private-access node:
 
 - Has every capability of an identity-linked node.
 - MAY sign fetch requests for private content of that pilot using the
-  `private_access_keypair` (private-mode raw IGC, protected raw companion,
-  private-visibility `flight-metadata`, `igc-metadata`).
+  `private_access_keypair` (private-mode raw IGC and protected raw companion).
 - MAY store plaintext private content it has fetched.
 - MUST keep stored plaintext private content confidential as a compliance and
   legal obligation of its terms of service. The protocol does not enforce
@@ -106,8 +104,8 @@ through the node-local login / grant UX described in the operator guides.
 ### 3.2 One keypair, all private content
 
 One `private_access_keypair` grants or revokes access to **all** of a pilot's
-non-public content simultaneously. `(R-ACCESS-06)` There is no per-flight,
-per-record-type, or per-visibility sub-scoping.
+pre-v0.5 non-public IGC content simultaneously. `(R-ACCESS-06)` There is no
+per-flight or per-artifact-class sub-scoping.
 
 ### 3.3 Key backup
 
@@ -149,8 +147,8 @@ MUST check the current governance state for the `raw_igc_hash` first:
    authorized `private_access_public_key` from the most recent
    `private-access-rotation-record`. `(R-ACCESS-08)`
    - Valid signature: transmit the requested plaintext bytes.
-   - Invalid, expired, replayed, or signed by a non-current key: reject the
-     request. `(R-ACCESS-09)`
+   - Invalid, replayed (`seq_num` ≤ last seen for this `requester_key`), or
+     signed by a non-current key: reject the request. `(R-ACCESS-09)`
 
 Key-possession proof does not override governance state.
 
@@ -161,9 +159,9 @@ Key-possession proof does not override governance state.
   "schema": "igc-net/fetch-request",
   "schema_version": 1,
   "raw_igc_hash": "<blake3-hex>",
+  "artifact_class": "protected_raw_companion|private_raw_igc",
   "requester_key": "<ed25519-public-key-hex>",
-  "nonce": "<32-byte-random-hex>",
-  "expires_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "seq_num": 1,
   "signature": "<ed25519-signature-hex>"
 }
 ```
@@ -171,12 +169,24 @@ Key-possession proof does not override governance state.
 - `requester_key` is the public half of the `private_access_keypair`. It
   MUST match the currently authorized `private_access_public_key` for the
   pilot who owns `raw_igc_hash`. `(R-ACCESS-10)`
-- `nonce` is 32 bytes of random data encoded as 64-character lowercase hex.
-  The serving node MUST reject duplicate
-  `(raw_igc_hash, requester_key, nonce)` triples seen within the last
-  5 minutes. `(R-ACCESS-11)`
-- `expires_at` MUST be at most 5 minutes after the request is created. The
-  serving node MUST reject expired requests. `(R-ACCESS-12)`
+- `artifact_class` MUST identify the restricted artifact being requested.
+  It MUST be either `protected_raw_companion` or `private_raw_igc`, and it
+  MUST match the artifact class the serving endpoint is being asked to
+  transmit. A serving node MUST reject a restricted fetch request whose signed
+  `artifact_class` does not match the requested artifact class or whose class
+  is not allowed by the current `publication_mode`. `(R-ACCESS-28)`
+- `seq_num` MUST be a positive integer (≥ 1) strictly greater than the
+  serving node's last-accepted `seq_num` for this `requester_key`. The
+  serving node MUST persist the last-accepted `seq_num` per `requester_key`
+  and MUST reject any request where `seq_num` ≤ `last_seen`. `(R-ACCESS-11)`
+  The serving node SHOULD durably store (fsync) the updated `seq_num` before
+  transmitting bytes; a node that loses its counter state on restart loses
+  replay protection until `seq_num` advances past the lost value.
+
+  **POC limitation:** `seq_num` registers are per-serving-node. A captured
+  request with `seq_num = N` can be replayed to a different serving node
+  whose last-seen is below `N`. Cross-node `seq_num` state synchronization
+  is deferred as post-POC hardening.
 - `signature` is the Ed25519 signature over the RFC 8785 canonical JSON of
   all fields except `signature`, signed with the private half of
   `private_access_keypair`.
@@ -187,8 +197,9 @@ The serving node transmits the requested bytes as plaintext over the iroh
 peer-to-peer connection to the requester; see `10-core.md §1.3`.
 
 The serving node MUST NOT transmit any non-public byte to a requester that
-has not produced a valid, non-expired, non-replayed fetch request signed by
-the pilot's currently authorized `private_access_public_key`. `(R-ACCESS-13)`
+has not produced a valid fetch proof with a strictly increasing `seq_num`,
+signed by the pilot's currently authorized `private_access_public_key`.
+`(R-ACCESS-13)`
 
 No grant record is presented by the requester. No gossip record is consulted
 for access authorization other than the current
@@ -232,6 +243,77 @@ the new node) is valid.
 
 No `access-grant` gossip record is emitted at any step of §5.1. The key
 transfer is direct, node-to-node, and leaves no protocol-plane trace.
+
+### 5.4 Portal-mediated igc-net handover
+
+For portal deployments, the portal is the user-facing handover boundary.
+The local igc-net service holds the `private_access_keypair` after the grant,
+but the initial transfer is carried by the portal that authenticated the pilot
+and obtained the pilot's consent.
+
+The portal-mediated handover sequence is:
+
+1. The portal authenticates the pilot and displays the exact access being
+   granted: protected raw companion and private raw IGC access for all of
+   that pilot's non-public artifacts.
+2. The portal obtains the pilot's `private_access_keypair` from the pilot,
+   from an existing custody portal, or from a local key-management tool.
+3. The portal calls the local igc-net key-provisioning RPC defined in
+   `proto/` and transfers the keypair to igc-net over the local RPC channel.
+4. igc-net validates that the private key matches the current
+   `private_access_public_key` for the pilot, stores the keypair in its
+   restricted state store, and becomes Category 2 for that pilot.
+5. The portal discards any transient copy of the private key after a
+   successful handover. A portal that is not itself an explicit custody
+   portal MUST NOT persist the private key. `(R-ACCESS-20)`
+
+After successful handover, restricted fetch signing is igc-net's
+responsibility. The portal MUST NOT need to construct private fetch
+challenges or sign restricted fetch requests on behalf of igc-net.
+`(R-ACCESS-21)`
+
+The key-provisioning RPC is an idempotent local custody operation:
+
+- The request MUST identify the pilot, carry the private half of
+  `private_access_keypair`, and carry the portal's expected current
+  `private_access_public_key`.
+- The private key bytes in the RPC MUST be the 32-byte Ed25519 seed used to
+  generate the keypair, as defined in `10-core.md §1.2`. The expected public
+  key MUST be the corresponding 32-byte compressed Ed25519 public key encoded
+  as lowercase hex.
+- igc-net MUST derive the public key from the supplied private key and reject
+  the request without mutating stored key state if the derived key does not
+  match the request's expected public key. `(R-ACCESS-23)`
+- igc-net MUST compare the expected public key with the latest active
+  `private-access-rotation-record` known for the pilot. If no active record is
+  known, or if governance state is too stale to decide, igc-net MUST reject the
+  request without mutating stored key state. `(R-ACCESS-24)`
+- If the expected public key is not the current active key in governance state,
+  igc-net MUST reject the request as rotated or stale and MUST NOT retain the
+  supplied private key. `(R-ACCESS-25)`
+- Re-provisioning the same key for the same pilot MUST be treated as success.
+  Provisioning a different key for the same pilot is allowed only when that key
+  matches the current active rotation record; replacement MUST be atomic, and
+  the old private key MUST be deleted before the operation is reported as
+  successful. `(R-ACCESS-26)`
+
+Successful provisioning means igc-net has accepted custody of the key. It does
+not by itself mean restricted serving is ready. Before signing restricted fetch
+requests for that pilot, igc-net MUST satisfy the governance catch-up and
+baseline requirements in `55-governance-sync.md §5`. `(R-ACCESS-27)`
+
+The normative gRPC surface for this handover is `ProvisionPrivateAccessKey` in
+`proto/igc_net_v0.proto`. Failure modes are:
+
+| Condition | Required failure | Error reason |
+|-----------|------------------|--------------|
+| Malformed `pilot_id`, malformed key bytes, or key/public-key mismatch | reject as invalid argument | `ERROR_REASON_INVALID_ARGUMENT` |
+| Local caller is not authorized to provision keys into this igc-net instance | reject as unauthorized | `ERROR_REASON_UNAUTHORIZED` |
+| No active private-access rotation record is known for the pilot | reject as missing active authorization key | `ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD` |
+| Governance state is stale | reject as governance stale | `ERROR_REASON_GOVERNANCE_STALE` |
+| No durable governance baseline exists | reject as governance stale | `ERROR_REASON_MISSING_GOVERNANCE_BASELINE` |
+| Expected public key is older than the active rotation record | reject as rotated key | `ERROR_REASON_ROTATED_KEY` |
+| State-store write, fsync, or atomic replacement fails | reject as internal failure and do not report success | `ERROR_REASON_INTERNAL` |
 
 ---
 
@@ -300,8 +382,13 @@ Effects:
   signatures for any non-public content of that pilot.
 - Other serving nodes stop receiving valid fetch requests from the revoked
   node and therefore stop delivering new content to it.
-- Any locally held plaintext private content SHOULD also be deleted; this is
-  a node compliance obligation, not a cryptographic enforcement. `(R-ACCESS-17)`
+- The node MUST delete locally held protected raw companion and private raw
+  IGC plaintext for that pilot unless a separate active durability custody
+  grant explicitly authorizes retention. `(R-ACCESS-17)`
+- The node SHOULD retain nothing after revocation. If retaining nothing would
+  permit accidental access resurrection, the node MAY keep only the minimum
+  non-secret tombstone needed to remember that access was revoked.
+  `(R-ACCESS-22)`
 
 If the pilot wants to deny authority to a compromised or untrusted node
 whose cooperation cannot be assumed, the pilot MUST rotate the keypair

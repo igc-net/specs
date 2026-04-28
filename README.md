@@ -59,6 +59,10 @@ Read these in dependency order:
 12. [90-conformance.md](./90-conformance.md)
 13. [92-threat-model.md](./92-threat-model.md)
 
+The igc-net gRPC/protobuf contract lives in [proto/](./proto/) and is
+normative during the v0.3 auxiliary-service migration. Generated clients and reference
+implementations must track that contract.
+
 ### Informative guides and contributor docs
 
 - [getting-started.md](./getting-started.md) — implementer onboarding
@@ -68,8 +72,8 @@ Read these in dependency order:
   guide
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — change and review rules
 
-If this README conflicts with a numbered normative document, the numbered
-document wins.
+If this README conflicts with a numbered normative document or the normative
+igc-net proto contract, the numbered document or proto contract wins.
 
 ## Interoperability Notes
 
@@ -84,7 +88,9 @@ key-derivation inputs are defined in the numbered specification documents.
 ## Repository Boundary
 
 This repository defines protocol semantics and related implementation guidance.
-It does not define language-specific APIs.
+It does not define language-specific APIs. The exception is the normative
+igc-net gRPC/protobuf contract in [proto/](./proto/), which defines the
+implementation-language-independent service boundary.
 
 Implementation repositories such as `igc-net-rs` and `igc-net-py` are
 informative with respect to the protocol. They may demonstrate feasible
@@ -94,7 +100,13 @@ behavior, but they do not override the specification.
 
 ### v0.3
 
-- normative transition from native `pilot-profile` to `PilotProfileCredential`
+- use iterative protocol slices: specify, review/test, implement, tighten, then
+  expand
+- tighten gossip, catch-up, and stale-state semantics
+- freeze IGC artifact access semantics for public raw, protected sanitized,
+  protected raw companion, and private raw IGC
+- define the normative igc-net gRPC/protobuf contract in [proto/](./proto/)
+- lightweight public metadata advertisements with portal-defined namespaces
 - `pilot_auth_did` as canonical wallet-held `did:key`
 - optional `did:web` for portal-issued/public-facing issuer identity and
   non-authoritative public aliases
@@ -115,6 +127,14 @@ behavior, but they do not override the specification.
 
 v1.0 is to be treated as production release of the standard.
 All the lower version designations are to be considered experimental, and no backwards compatibility should be expected.
+
+The v0.3-v0.5 baseline scope is artifact identity, gossip/discovery, IGC file
+access, governance freshness, igc-net service operation, and conformance for those
+surfaces. Public metadata advertisements are intentionally minimal and
+portal-defined. Standard native metadata records, `igc-metadata`, metadata merge
+policy, standardized analytics schemas, and `IGC_META_DOC` are deferred until
+after v0.5. They may be considered for v1.0 once the v0.5 igc-net service and
+portal baseline is in place.
 
 ## Change Process
 

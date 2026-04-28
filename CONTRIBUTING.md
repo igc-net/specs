@@ -5,7 +5,7 @@
 This repository contains protocol-level documentation only:
 
 - wire-format and content-addressing rules
-- metadata and analytics schema definitions
+- metadata advertisement and deferred analytics boundary definitions
 - interoperability requirements
 - governance notes and open protocol questions
 
