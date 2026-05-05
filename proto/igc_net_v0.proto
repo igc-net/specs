@@ -9,6 +9,10 @@ package igc_net.v0;
 
 service IgcNet {
   rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse);
+  rpc RegisterPilot(RegisterPilotRequest) returns (RegisterPilotResponse);
+  rpc ListPilots(ListPilotsRequest) returns (ListPilotsResponse);
+  rpc IssuePortalAuthToken(IssuePortalAuthTokenRequest)
+      returns (IssuePortalAuthTokenResponse);
   rpc PublishFlight(PublishFlightRequest) returns (PublishFlightResponse);
   rpc FetchArtifact(FetchArtifactRequest) returns (FetchArtifactResponse);
   rpc QueryIndex(QueryIndexRequest) returns (QueryIndexResponse);
@@ -40,6 +44,9 @@ enum ErrorReason {
   ERROR_REASON_MISSING_GOVERNANCE_BASELINE = 12;
   ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD = 13;
   ERROR_REASON_ARTIFACT_CLASS_NOT_ALLOWED = 14;
+  ERROR_REASON_REVOKED = 15;
+  ERROR_REASON_EVENT_HISTORY_PRUNED = 16;
+  ERROR_REASON_MISSING_OWNER = 17;
 }
 
 message GetNodeStatusRequest {}
@@ -48,10 +55,15 @@ message GetNodeStatusResponse {
   string protocol_version = 1;
   string api_version = 2;
   string node_id = 3;
+  // Service-level readiness. This is not proof that every pilot-specific
+  // restricted-serving path is ready.
   bool ready = 4;
   GovernanceSyncState governance_sync_state = 5;
   uint64 latest_event_seq = 6;
   bool governance_baseline_ready = 7;
+  bool blob_store_ready = 8;
+  bool artifact_registry_ready = 9;
+  bool event_cursor_ready = 10;
 }
 
 enum GovernanceSyncState {
@@ -67,6 +79,9 @@ message PublishFlightRequest {
   bytes raw_igc = 1;
   string filename = 2;
   PublicationMode publication_mode = 3;
+  // Required for protected and private modes. Optional for public
+  // (anonymous publish if absent). Must be a pilot registered on this node.
+  string pilot_id = 4;
 }
 
 message PublishFlightResponse {
@@ -83,6 +98,52 @@ enum PublicationMode {
   PUBLICATION_MODE_PRIVATE = 3;
 }
 
+message RegisterPilotRequest {
+  string display_name = 1;
+  // Raw PIN transmitted over the trusted local gRPC connection.
+  // Stored as an Argon2id hash by the sidecar; never persisted in plaintext.
+  string access_pin = 2;
+  // ISO 3166-1 alpha-2; optional.
+  string country = 3;
+}
+
+message RegisterPilotResponse {
+  // igcnet:id:<hex>
+  string pilot_id = 1;
+  // did:key:z6Mk...
+  string pilot_auth_did = 2;
+  string display_name = 3;
+}
+
+message ListPilotsRequest {}
+
+message PilotSummary {
+  string pilot_id = 1;
+  string display_name = 2;
+  string country = 3;
+}
+
+message ListPilotsResponse {
+  repeated PilotSummary pilots = 1;
+}
+
+message IssuePortalAuthTokenRequest {
+  string pilot_id = 1;
+  // Becomes JWT aud claim.
+  string portal_id = 2;
+  // Unique nonce from the portal.
+  string jti = 3;
+  // Raw PIN for Argon2id verification.
+  string access_pin = 4;
+  // 0 = sidecar default (3600).
+  uint32 expires_in_seconds = 5;
+}
+
+message IssuePortalAuthTokenResponse {
+  // Compact W3C VC-JWT (EdDSA/Ed25519, vc+jwt). The portal verifies locally.
+  string pilot_profile_vc_jwt = 1;
+}
+
 message FetchArtifactRequest {
   string raw_igc_hash = 1;
   ArtifactClass artifact_class = 2;
@@ -95,7 +156,12 @@ message FetchArtifactRequest {
 
 message FetchArtifactResponse {
   bytes artifact_bytes = 1;
+  // Hash of artifact_bytes. For public_raw_igc, protected_raw_companion, and
+  // private_raw_igc this equals raw_igc_hash. For protected_sanitized_igc this
+  // equals protected_hash.
   string artifact_hash = 2;
+  string raw_igc_hash = 3;
+  ArtifactClass artifact_class = 4;
 }
 
 enum ArtifactClass {
@@ -121,16 +187,39 @@ message IndexEntry {
   PublicationMode publication_mode = 2;
   string protected_hash = 3;
   repeated string serving_node_ids = 4;
+  // Artifact classes that this service currently has local bytes for and is
+  // willing to expose as locally available under the effective publication mode.
+  repeated ArtifactClass locally_available_artifact_classes = 5;
+  // Local governance state used for serving decisions. This is the service's
+  // applied view, not a global finality proof.
+  GovernanceServingState governance_serving_state = 6;
+  // True only when the service currently has a locally available artifact class
+  // and the applied governance view does not forbid serving.
+  bool locally_fetchable = 7;
+  // Latest local artifact-registry/event sequence that changed this entry.
+  uint64 updated_event_seq = 8;
+}
+
+enum GovernanceServingState {
+  GOVERNANCE_SERVING_STATE_UNSPECIFIED = 0;
+  GOVERNANCE_SERVING_STATE_UNKNOWN = 1;
+  GOVERNANCE_SERVING_STATE_PENDING = 2;
+  GOVERNANCE_SERVING_STATE_APPROVED = 3;
+  GOVERNANCE_SERVING_STATE_CONTESTED = 4;
+  GOVERNANCE_SERVING_STATE_REJECTED = 5;
+  GOVERNANCE_SERVING_STATE_DELETED = 6;
+  GOVERNANCE_SERVING_STATE_STALE = 7;
 }
 
 message SubscribeEventsRequest {
-  // 0-based event sequence. Delivery is at-least-once.
+  // 0-based local event sequence. Delivery is at-least-once.
   uint64 from_seq = 1;
 }
 
 message IgcNetEvent {
   uint64 seq = 1;
   EventKind kind = 2;
+  // Post-event local index view for the affected raw_igc_hash.
   IndexEntry entry = 3;
 }
 
@@ -165,7 +254,14 @@ message RevokePrivateAccessRequest {
 
 message RevokePrivateAccessResponse {
   string pilot_id = 1;
+  // True when key material for pilot_id was deleted or was already absent.
   bool key_deleted = 2;
+  // True when local restricted plaintext serving state for pilot_id has been
+  // disabled and best-effort deletion has been attempted for managed storage
+  // layers that support it. This is not a claim of provable physical erasure;
+  // see 70-durability.md.
   bool restricted_plaintext_deleted = 3;
+  // True when the service retained non-secret tombstone state to prevent
+  // accidental access resurrection.
   bool tombstone_retained = 4;
 }
