@@ -333,7 +333,15 @@ Resolution order:
 If the accepted owner is unknown for a restricted artifact, the active
 private-access key cannot be resolved. The serving node MUST fail closed rather
 than infer ownership from the requesting key, local account state, or ticket
-possession.
+possession. `(R-TRANS-27)`
+
+On success, `FetchArtifactResponse.artifact_hash` MUST be the hash of the
+returned `artifact_bytes`. For `public_raw_igc`, `protected_raw_companion`, and
+`private_raw_igc`, this MUST equal the request `raw_igc_hash`; for
+`protected_sanitized_igc`, this MUST equal the current effective
+`protected_hash`. The response MUST also echo the canonical `raw_igc_hash` and
+the served `artifact_class` so clients can validate response binding without
+inferring it from transport state. `(R-TRANS-28)`
 
 The proto `ErrorReason` values map to this sequence as follows:
 
@@ -362,23 +370,41 @@ data-plane announcements, and applied governance state.
 local service knows governance state forbids serving it. Entries for stale,
 deleted, contested, or rejected artifacts MAY be omitted or retained only in
 implementation-specific diagnostics; they MUST NOT be presented as ordinary
-fetchable results.
+fetchable results. `(R-TRANS-29)`
+
+Each ordinary `QueryIndex` entry MUST identify the current local view of:
+
+- `raw_igc_hash`
+- effective `publication_mode`
+- `protected_hash`, when mode is `protected`
+- serving node IDs known for the entry
+- artifact classes locally available to this service
+- governance serving state visible to this service
+- whether the service currently considers the entry locally fetchable
+- the latest local event sequence that changed the entry
+
+The locally available artifact classes MUST be derived from artifact registry
+state plus the effective publication mode. A private or protected raw companion
+tombstone MUST remove the corresponding restricted class from this list.
+`(R-TRANS-30)`
 
 `SubscribeEvents` streams local service index events from a local monotonic
 `seq` cursor. The cursor is scoped to one igc-net service instance and is not a
 network-wide ordering authority. Delivery is at-least-once: clients MUST handle
-duplicate events by `seq` and by the indexed `raw_igc_hash`.
+duplicate events by `seq` and by the indexed `raw_igc_hash`. Each event MUST
+carry an `IndexEntry` representing the local post-event view for that
+`raw_igc_hash`. `(R-TRANS-31)`
 
 The service MUST persist enough event-cursor state to make `latest_event_seq`
 in `GetNodeStatus` meaningful across restart. If an implementation prunes old
 event history and a client asks for a `from_seq` older than the retained lower
 bound, the service MUST fail the subscription rather than silently starting from
-a later sequence.
+a later sequence. `(R-TRANS-32)`
 
 Events are emitted when local publish, remote announcement processing, or
 governance updates change the local index state visible through `QueryIndex`.
 Receiving a duplicate data-plane or governance record that does not change local
-index state MUST NOT require a new event.
+index state MUST NOT require a new event. `(R-TRANS-33)`
 
 ---
 

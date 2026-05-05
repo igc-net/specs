@@ -321,6 +321,15 @@ The normative gRPC surface for this handover is `ProvisionPrivateAccessKey` in
 | Expected public key is older than the active rotation record | reject as rotated key | `ERROR_REASON_ROTATED_KEY` |
 | State-store write, fsync, or atomic replacement fails | reject as internal failure and do not report success | `ERROR_REASON_INTERNAL` |
 
+For first-portal proof-of-concept deployments, a pre-seeded operator bootstrap
+is allowed: the operator may create or import the initial
+`private-access-rotation-record` for the local pilot before calling
+`ProvisionPrivateAccessKey`. This is an implementation/bootstrap choice, not a
+new protocol grant record. The fail-closed requirements above still apply; a
+service MUST reject private publication and restricted signing until both the
+authoritative rotation record and matching provisioned key are present.
+`(R-ACCESS-29)`
+
 ---
 
 ## 6. Authorization key publication and rotation
@@ -395,6 +404,12 @@ Effects:
   permit accidental access resurrection, the node MAY keep only the minimum
   non-secret tombstone needed to remember that access was revoked.
   `(R-ACCESS-22)`
+
+The normative gRPC surface for local key deletion is `RevokePrivateAccess` in
+`proto/igc_net_v0.proto`. On success, the response MUST identify the `pilot_id`,
+report that key material was deleted or already absent, report whether local
+restricted plaintext serving state was disabled for that pilot, and report
+whether a non-secret tombstone was retained. `(R-ACCESS-30)`
 
 If the pilot wants to deny authority to a compromised or untrusted node
 whose cooperation cannot be assumed, the pilot MUST rotate the keypair

@@ -83,6 +83,19 @@ locally held protected raw companion and private raw IGC plaintext unless a
 separate active durability custody grant explicitly authorizes retention.
 `(R-DUR-12)`
 
+The node MAY retain only non-secret tombstone state needed to avoid accidental
+access resurrection. That tombstone MUST NOT contain restricted plaintext,
+private key material, or a locator that the node continues to expose as
+fetchable. `(R-DUR-13)`
+
+Physical erasure across every local storage backend is a best-effort
+obligation, not a provable protocol guarantee. An implementation MUST NOT claim
+cryptographically or mechanically provable erasure of all restricted plaintext
+copies. It MUST stop serving the restricted artifact, remove any plaintext copy
+from storage layers it explicitly manages where deletion is supported, and
+ensure retained tombstones do not expose the content as fetchable.
+`(R-DUR-14)`
+
 ### 2.4 After processing a `private-access-rotation-record`
 
 See `60-keys-and-access.md §6.2`. Stop signing or accepting fetch-request

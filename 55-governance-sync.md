@@ -274,7 +274,7 @@ state are not retroactively penalised.
 The normative `GetNodeStatus` RPC reports readiness for the igc-net service
 instance, not for the surrounding portal.
 
-`ready` MUST be `true` only when:
+`ready` MUST be `true` only when: `(R-GSYNC-20)`
 
 - the persistent `node_id` keypair is loaded
 - the blob store is open
@@ -286,7 +286,12 @@ instance, not for the surrounding portal.
 `governance_baseline_ready` MUST report whether the durable governance baseline
 required by §5.2 has been recovered or built. If the service holds any
 `private_access_keypair`, `governance_baseline_ready = false` means restricted
-serving for affected pilots is not ready.
+serving for affected pilots is not ready. `(R-GSYNC-21)`
+
+`blob_store_ready`, `artifact_registry_ready`, and `event_cursor_ready` are
+service-store readiness indicators. They MUST describe local service
+dependencies only; they MUST NOT be treated as authorization to serve any
+particular restricted artifact. `(R-GSYNC-22)`
 
 `governance_sync_state` MUST distinguish at least:
 
@@ -302,4 +307,4 @@ serving for pilots whose governance state is stale. In that state,
 governance or readiness error. `GetNodeStatus.ready` MUST NOT be used by
 clients as proof that every pilot-specific restricted-serving path is ready;
 `ProvisionPrivateAccessKeyResponse.restricted_serving_ready` is the
-pilot-specific readiness signal after key handover.
+pilot-specific readiness signal after key handover. `(R-GSYNC-23)`

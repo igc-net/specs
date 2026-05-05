@@ -270,27 +270,36 @@ that compliant obligations apply only to compliant nodes.
 
 ## 6. Test case to requirement mapping
 
-The following test-file convention maps each requirement namespace to a
-corresponding test document. These files define the v0.3 draft conformance
-cases that implementations use when turning the normative text into executable
-tests. The Markdown cases are authoritative test intent; implementation
-harnesses may encode them in language-specific fixtures as long as they
-preserve the stated preconditions, actions, expected outcomes, and requirement
-coverage.
+Executable conformance cases are maintained in implementation repositories for
+the v0.3 draft. The requirement namespaces below define the mapping that those
+fixtures MUST preserve. An implementation fixture may use any file name or test
+harness structure, provided each covered case states the relevant `R-*` labels,
+preconditions, action, and expected outcome.
 
-| Test file | Requirement prefix |
-|-----------|------------------|
-| `TEST.CASES.CORE.md` | `R-CORE-*` |
-| `TEST.CASES.ARTIFACTS.md` | `R-ART-*` |
-| `TEST.CASES.TRANSPORT.md` | `R-TRANS-*` |
-| `TEST.CASES.METADATA.md` | `R-META-*` |
-| `TEST.CASES.GOVERNANCE.md` | `R-GOV-*`, `R-GSYNC-*` |
-| `TEST.CASES.KEYS.md` | `R-ACCESS-*` |
-| `TEST.CASES.AUTH.md` | `R-AUTH-*` |
-| `TEST.CASES.DURABILITY.md` | `R-DUR-*` |
-| `TEST.CASES.ANALYTICS.md` | Derived-metadata examples using `R-META-*` |
-| `TEST.CASES.THREAT.md` | `R-THREAT-*` |
+| Fixture area | Requirement prefix |
+|--------------|--------------------|
+| Core identifiers, hashes, signatures, canonicalization | `R-CORE-*` |
+| Artifact modes, classes, sanitization, serving matrix | `R-ART-*` |
+| Transport, announcements, fetch, index/event service behavior | `R-TRANS-*` |
+| Public metadata advertisements | `R-META-*` |
+| Governance and governance sync | `R-GOV-*`, `R-GSYNC-*` |
+| Keys, private access, provisioning, revocation | `R-ACCESS-*` |
+| Pilot authentication DID | `R-AUTH-*` |
+| Durability and deletion obligations | `R-DUR-*` |
+| Deferred analytics boundary | derived-metadata examples using `R-META-*` |
+| Threat-model obligations | `R-THREAT-*` |
 
 `R-*` labels are embedded inline at the relevant MUST/MUST NOT statements
-in each normative document. Coverage is verifiable by grepping for a label
-in both the spec file and its corresponding test file.
+in each normative document. Coverage is verified in implementation repositories
+by mapping executable fixture names to the labels they cover.
+
+For the Rust reference implementation, the current executable fixture anchors
+are:
+
+| Fixture path | Coverage intent |
+|--------------|-----------------|
+| `igc-net/tests/conformance_fixtures.rs` | Pure protocol/state fixtures for access proofs, governance state, publication-mode chains, sanitization, key custody, durability tombstones, and local event cursor semantics |
+| `igc-net-grpc/tests/process_grpc.rs` | Process-level gRPC fixtures for `GetNodeStatus`, `PublishFlight`, `FetchArtifact`, `QueryIndex`, `SubscribeEvents`, `ProvisionPrivateAccessKey`, and `RevokePrivateAccess` |
+
+These file names are informative, not normative. The requirement labels in
+the executable tests are the traceability boundary.
