@@ -172,6 +172,8 @@ state and key-possession proof.
 | `private_access_keypair` | Pilot's Ed25519 keypair used to authorize fetch requests for pre-v0.5 non-public IGC content (private raw IGC and protected raw companion). |
 | `private_access_public_key` | Public half of `private_access_keypair`, published via `private-access-rotation-record` on the governance topic |
 | `metadata-advertisement` | Public portal-defined advertisement for metadata or derived resources associated with igc-net identifiers |
+| `g_record_present` | Boolean attribute derived from raw IGC bytes; true if the file contains at least one line whose first byte is ASCII `G` |
+| `signature-attestation` | Standardized public record by which a `node_id` vouches for the result of running an external vendor signature validator against the raw IGC bytes for a given `raw_igc_hash` |
 | identity-linked node (Category 1) | Node that knows a pilot's `pilot_id` but does NOT hold the pilot's `private_access_keypair`; may serve `public` and `protected` artifacts only |
 | private-access node (Category 2) | Node that holds a pilot's `private_access_keypair`; may sign fetch requests for the pilot's non-public content |
 | `publication_mode` | Artifact access state: `public`, `protected`, or `private` |

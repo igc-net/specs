@@ -338,3 +338,77 @@ The `sanitized_as` relation is a directed link from the identity anchor to
 the sanitized artifact identity. It is published with the protected flight
 record. No `sanitized_as` relation exists for `public` or `private` mode
 artifacts.
+
+---
+
+## 10. IGC signature presence
+
+### 10.1 Definition
+
+```
+g_record_present = (raw_igc_bytes contains at least one line whose first byte is ASCII 'G' (0x47))
+```
+
+`g_record_present` is a boolean attribute derived purely from the raw IGC
+bytes. `(R-SIG-01)`
+
+A "line" is a byte sequence terminated by `LF` (0x0A) or `CRLF` (0x0D 0x0A) or
+by end-of-file. The first byte of a line is the byte immediately following the
+preceding line terminator, or the first byte of the file for the first line.
+
+No whitespace normalisation, BOM stripping, or transcoding is applied prior to
+the check. The check operates directly on the raw IGC bytes from which
+`raw_igc_hash` is computed. `(R-SIG-02)`
+
+Two implementations evaluating `g_record_present` for the same raw IGC bytes
+MUST produce the same value. `(R-SIG-03)`
+
+### 10.2 Semantics
+
+`g_record_present == true` indicates only that the file structurally claims to
+carry a digital signature. It is NOT evidence that the signature is valid,
+authentic, or produced by the original recording device. `(R-SIG-04)`
+
+`g_record_present == false` indicates that the file carries no G-record and
+therefore cannot bear a recorder-device signature.
+
+A file derived from an original IGC (re-exported, converted, edited) typically
+loses its G-record block and produces `g_record_present == false`. Receivers
+MAY use this as a coarse filter when distinguishing original recorder output
+from derived output, with the explicit caveat that
+`g_record_present == true` does not prove non-derivation.
+
+`g_record_present` does not affect `publication_mode`, ownership, access
+authorization, or any governance decision. It is an informational attribute of
+the artifact bytes only. `(R-SIG-05)`
+
+### 10.3 Sanitization interaction
+
+The sanitization algorithm in §3.1 does not modify G-records and does not add
+or remove lines. Therefore, for any raw IGC bytes:
+
+```
+g_record_present(raw_igc_bytes) == g_record_present(sanitized_igc_bytes)
+```
+
+However, recorder-device signatures are computed over the original raw bytes
+and MUST be verified against the raw IGC bytes only. A G-record copied through
+sanitization is structurally present in the sanitized artifact but no longer
+verifies against the sanitized bytes, because header lines were rewritten.
+`(R-SIG-06)`
+
+Verification attestations defined in `40-pilot-and-metadata.md §6` anchor on
+`raw_igc_hash` for this reason and MUST NOT anchor on `protected_hash`.
+`(R-SIG-07)`
+
+### 10.4 Use in records
+
+The attribute is computable from raw IGC bytes and does not need to be carried
+in records to be derivable. Specific records MAY carry an optional
+`g_record_present` field; see `30-transport.md §2` for the announcement
+record. When the field is present in a record, its value MUST equal the value
+computed from the raw IGC bytes. A receiver that holds the raw IGC bytes MUST
+use its own computed value as authoritative. `(R-SIG-08)`
+
+A receiver that does not hold the raw IGC bytes MAY use an advertised
+`g_record_present` value as an indicative signal only.

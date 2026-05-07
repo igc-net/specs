@@ -215,6 +215,7 @@ identity field:
 | `igc-net/resolver-profile` | `resolver_id` | Decode hex → Ed25519 public key |
 | `igc-net/announcement` | `node_id` | Decode hex → Ed25519 public key |
 | `igc-net/metadata-advertisement` | `node_id` | Decode hex → Ed25519 public key |
+| `igc-net/signature-attestation` | `node_id` | Decode hex → Ed25519 public key |
 | `igc-net/fetch-request` | `requester_key` | Decode hex → Ed25519 public key (MUST match current `private_access_public_key` for the pilot) |
 
 To sign a record:

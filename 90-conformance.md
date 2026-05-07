@@ -30,6 +30,7 @@ requirements.
 | `R-ART-xx` | Artifacts and publication modes | `20-artifacts.md` |
 | `R-TRANS-xx` | Data-plane transport | `30-transport.md` |
 | `R-META-xx` | Public metadata advertisements | `40-pilot-and-metadata.md` |
+| `R-SIG-xx` | IGC signature presence and verification attestations | `20-artifacts.md §10`, `40-pilot-and-metadata.md §6` |
 | `R-GOV-xx` | Governance semantics | `50-governance.md` |
 | `R-GSYNC-xx` | Governance sync and propagation | `55-governance-sync.md` |
 | `R-ACCESS-xx` | Keys, node categories, and access | `60-keys-and-access.md` |
@@ -69,7 +70,14 @@ publishes artifacts.
   required to implement re-announcement, stale-ticket pruning, or governance
   catch-up behavior.
 
-**MAY omit:** governance, metadata advertisements, durability, analytics.
+**SHOULD implement:**
+
+- `R-SIG-*` parser-side `g_record_present` computation (`20-artifacts.md §10`).
+  The check is mechanical and deterministic and SHOULD be applied to every
+  ingested raw IGC.
+
+**MAY omit:** governance, metadata advertisements, durability, analytics,
+issuance of signature-verification attestations.
 
 ### 3.2 Serving node
 
@@ -91,6 +99,9 @@ A serving node stores artifacts and responds to fetch requests.
 **SHOULD implement:**
 
 - `R-DUR-*` — mode upgrade and deletion obligations
+- `R-SIG-*` validation and indexing of received `signature-attestation`
+  records (`40-pilot-and-metadata.md §6`); honoring the optional
+  `g_record_present` field on announcements per `30-transport.md §2`
 
 ### 3.3 Identity-linked node (Category 1)
 
@@ -282,6 +293,7 @@ preconditions, action, and expected outcome.
 | Artifact modes, classes, sanitization, serving matrix | `R-ART-*` |
 | Transport, announcements, fetch, index/event service behavior | `R-TRANS-*` |
 | Public metadata advertisements | `R-META-*` |
+| IGC signature presence and verification attestations | `R-SIG-*` |
 | Governance and governance sync | `R-GOV-*`, `R-GSYNC-*` |
 | Keys, private access, provisioning, revocation | `R-ACCESS-*` |
 | Pilot authentication DID | `R-AUTH-*` |

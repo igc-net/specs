@@ -75,6 +75,19 @@ For `private` mode, no additional artifact-identity fields are carried —
 `raw_igc_hash` alone identifies the private flight and its raw plaintext
 artifact.
 
+An announcement MAY additionally carry an optional `g_record_present` field
+(see `20-artifacts.md §10`):
+
+```json
+{
+  "g_record_present": true
+}
+```
+
+When present, its value MUST equal the boolean computed from the raw IGC
+bytes. A receiver that fetches the raw IGC bytes MUST use its own computed
+value as authoritative. `(R-SIG-08)`
+
 ### 2.3 Required fields
 
 - `raw_igc_hash`: the identity anchor for the flight.
@@ -91,6 +104,9 @@ artifact.
   serves the raw companion for a protected flight. MAY be omitted when the
   node holds only the sanitized artifact. MUST be absent for `"public"` and
   `"private"` modes. `(R-TRANS-15)`
+- `g_record_present`: OPTIONAL boolean. When present, it MUST equal the value
+  defined in `20-artifacts.md §10` for the raw IGC bytes referenced by
+  `raw_igc_hash`. See §2.2.
 
 ### 2.4 Signing rules
 
