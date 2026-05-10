@@ -36,6 +36,7 @@ requirements.
 | `R-ACCESS-xx` | Keys, node categories, and access | `60-keys-and-access.md` |
 | `R-AUTH-xx` | Pilot authentication DID binding and rotation | `65-pilot-auth-did.md` |
 | `R-DUR-xx` | Durability and erasure | `70-durability.md` |
+| `R-GROUP-xx` | Group-based access control, private/public groups, follow records | `75-groups-and-social.md` |
 | `R-THREAT-xx` | Threat-driven security obligations | `92-threat-model.md` |
 
 Every `R-*` label MUST trace to at least one normative MUST or MUST NOT
@@ -99,6 +100,8 @@ A serving node stores artifacts and responds to fetch requests.
 **SHOULD implement:**
 
 - `R-DUR-*` — mode upgrade and deletion obligations
+- `R-GROUP-*` — group-fetch-proof verification and membership checks when a
+  `GroupFetchProof` is present in a `FetchArtifactRequest`
 - `R-SIG-*` validation and indexing of received `signature-attestation`
   records (`40-pilot-and-metadata.md §6`); honoring the optional
   `g_record_present` field on announcements per `30-transport.md §2`
@@ -149,10 +152,10 @@ sign fetch requests for the pilot's non-public content.
 
 - Portal-to-portal key-exchange grant flow (`60-keys-and-access.md §5`).
 
-**Deferred until after v0.5:** standardized native metadata records,
-`igc-metadata`, and metadata merge behavior. A pre-v0.5 Private-Access Node is
-conformant if it implements private raw IGC and protected raw companion access
-without standardized metadata exchange.
+**Out of scope:** standardized native metadata records, `igc-metadata`, and
+metadata merge behavior. A Private-Access Node is conformant if it implements
+private raw IGC and protected raw companion access without standardized metadata
+exchange.
 
 ### 3.5 Relying-party portal / authentication endpoint
 
@@ -227,10 +230,13 @@ is the canonical authority.
 
 7. **Non-public IGC content requires a signed fetch request.** Private raw IGC
    bytes and protected raw companions MUST be served only to requesters who
-   present a fetch request signed by the pilot's currently authorized
-   `private_access_keypair`. Public metadata advertisements do not grant access
-   to referenced protected or private resources. The bytes transmitted are
-   plaintext; the iroh transport provides in-flight confidentiality.
+   either (a) present a fetch request signed by the pilot's currently authorized
+   `private_access_keypair`, or (b) present a valid `GroupFetchProof`
+   demonstrating current group membership that grants access to the requested
+   artifact (`75-groups-and-social.md §5`). Public metadata advertisements do
+   not grant access to referenced protected or private resources. The bytes
+   transmitted are plaintext; the iroh transport provides in-flight
+   confidentiality.
 
 8. **`publication_mode` and metadata advertisement policy are distinct.**
    `publication_mode` governs artifact access state (`public`,
@@ -281,8 +287,8 @@ that compliant obligations apply only to compliant nodes.
 
 ## 6. Test case to requirement mapping
 
-Executable conformance cases are maintained in implementation repositories for
-the v0.3 draft. The requirement namespaces below define the mapping that those
+Executable conformance cases are maintained in implementation repositories.
+The requirement namespaces below define the mapping that those
 fixtures MUST preserve. An implementation fixture may use any file name or test
 harness structure, provided each covered case states the relevant `R-*` labels,
 preconditions, action, and expected outcome.
@@ -298,6 +304,7 @@ preconditions, action, and expected outcome.
 | Keys, private access, provisioning, revocation | `R-ACCESS-*` |
 | Pilot authentication DID | `R-AUTH-*` |
 | Durability and deletion obligations | `R-DUR-*` |
+| Groups, social follow, group-based fetch authorization | `R-GROUP-*` |
 | Deferred analytics boundary | derived-metadata examples using `R-META-*` |
 | Threat-model obligations | `R-THREAT-*` |
 

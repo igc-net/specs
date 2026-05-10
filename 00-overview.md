@@ -23,6 +23,7 @@ This specification defines:
 - publication mode changes and access grant revocation
 - erasure and deletion semantics
 - governance topic and sync semantics
+- group-based access control and social follow
 
 igc-net uses a **decentralised data plane** for artifact publication and transport,
 and a **permissioned governance plane** for ownership, access policy, and dispute
@@ -169,7 +170,7 @@ state and key-possession proof.
 | `pilot_auth_did` | Pilot's rotatable authentication / VC-issuer DID, bound authoritatively to `pilot_id` by `pilot-auth-did-record` |
 | `node_id` | Serving node Ed25519 keypair identity |
 | `resolver_id` | Trusted resolver Ed25519 keypair identity |
-| `private_access_keypair` | Pilot's Ed25519 keypair used to authorize fetch requests for pre-v0.5 non-public IGC content (private raw IGC and protected raw companion). |
+| `private_access_keypair` | Pilot's Ed25519 keypair used to authorize fetch requests for non-public IGC content (private raw IGC and protected raw companion). |
 | `private_access_public_key` | Public half of `private_access_keypair`, published via `private-access-rotation-record` on the governance topic |
 | `metadata-advertisement` | Public portal-defined advertisement for metadata or derived resources associated with igc-net identifiers |
 | `g_record_present` | Boolean attribute derived from raw IGC bytes; true if the file contains at least one line whose first byte is ASCII `G` |
@@ -187,6 +188,11 @@ state and key-possession proof.
 | announce topic | The well-known publish/subscribe topic for data-plane announcements |
 | canonical JSON | RFC 8785 serialisation used for signing and record-ID computation |
 | `record_id` | `BLAKE3(canonical_json(record_without_signature))` |
+| `GroupId` | `igcnet:group:<32 lowercase hex chars>` — stable, immutable identifier for a group; derived from 16 random bytes generated at group creation |
+| private group | Pilot-created group; the owner adds members who gain access to all of the owner's non-public flights (past and future) |
+| public group | Opt-in group; membership obligates sharing all of a pilot's flights with all other group members, regardless of publication mode |
+| `GroupFetchProof` | Signed wire credential presented in a `FetchArtifactRequest` to authorize access via group membership, as an alternative to the `private_access_keypair` path |
+| follow | A pilot's subscription to upload notifications from another pilot; access level follows the followee's publication mode unless a shared group applies |
 
 `publication_mode` governs artifact access state. Metadata advertisements are
 always public and do not grant access to referenced protected or private
@@ -199,8 +205,7 @@ resources.
 The normative specification consists of the numbered documents below plus the
 igc-net gRPC/protobuf contracts under `proto/` when service behavior is in
 scope. Examples inside these documents are non-normative unless explicitly
-stated otherwise. During the v0.3 draft period, `proto/` evolves in place and
-breaking changes are allowed until a stable public release.
+stated otherwise.
 
 | # | File | Purpose | Depends on |
 |---|------|---------|-----------|
@@ -214,6 +219,7 @@ breaking changes are allowed until a stable public release.
 | 60 | `60-keys-and-access.md` | Node access categories, `private_access_keypair`, fetch authorization, rotation | 50 |
 | 65 | `65-pilot-auth-did.md` | Authentication DID binding and rotation | 10, 50, 55, 60 |
 | 70 | `70-durability.md` | Durability obligations, archive custody, deletion enforcement | 60 |
+| 75 | `75-groups-and-social.md` | Group-based access control, private/public groups, follow records | 60, 70 |
 | 80 | `80-analytics.md` | Deferred derived metadata and analytics boundary | 40 |
 | 90 | `90-conformance.md` | Requirement IDs, conformance profiles, cross-document invariants | all |
 | 92 | `92-threat-model.md` | Threat and abuse model for the identity and governance surface | 00, 10, 20, 30, 50, 55, 60, 65, 70 |
@@ -228,16 +234,16 @@ breaking changes are allowed until a stable public release.
  10-core
      |
  20-artifacts
-    |
-30-transport
-    |
-  50-governance
-    |
-55-governance-sync
-    |
-60-keys-and-access
-    /         \
-65-pilot-auth-did              70-durability
+    |       \
+30-transport  50-governance
+                   |
+             55-governance-sync
+                   |
+             60-keys-and-access
+                /         \
+      65-pilot-auth-did  70-durability
+                               |
+                        75-groups-and-social
 
 40-pilot-and-metadata ← depends on 10-core, 20-artifacts, 30-transport
 80-analytics  ← depends on 40-pilot-and-metadata
@@ -245,7 +251,7 @@ breaking changes are allowed until a stable public release.
 92-threat-model ← depends on the core and identity docs
 ```
 
-Reading order for implementers: 00 → 10 → 20 → 30 → 40 → 50 → 55 → 60 → 65 → 70.
+Reading order for implementers: 00 → 10 → 20 → 30 → 40 → 50 → 55 → 60 → 65 → 70 → 75.
 Read 80 for the derived metadata and analytics boundary.
 Read 90 for conformance mapping.
 Read 92 for the threat and abuse model.

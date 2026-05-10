@@ -4,6 +4,8 @@
 **Depends on:** `10-core.md`, `20-artifacts.md`, `50-governance.md`,
 `60-keys-and-access.md`
 
+See also: `75-groups-and-social.md §2.6` for group membership record obligations.
+
 ---
 
 ## 1. Durability by publication mode
@@ -107,6 +109,25 @@ See `50-governance.md §7.2`. Freeze non-public content release for the hash
 `(R-DUR-07)`; refuse all restricted fetch requests until resolved
 `(R-DUR-08)`.
 
+### 2.6 Group membership records and flight deletion
+
+Group membership records (`75-groups-and-social.md §4`) and follow records are
+not flight-scoped. A valid deletion request for a `raw_igc_hash` does not
+require those records to be removed. `(R-DUR-15)`
+
+After a deletion request for a `raw_igc_hash` is processed, a compliant node
+MUST refuse any subsequent group-based fetch request for that hash. The raw IGC
+bytes are no longer held; the governance-state check in
+`75-groups-and-social.md §5.3` enforces this by returning `not_found` once the
+bytes are purged. `(R-DUR-16)`
+
+Group membership records and follow records constitute personal data. A node
+SHOULD remove a pilot's own group membership records and follow records within
+30 days of a pilot-initiated personal-data erasure request. The igc-net
+governance-topic deletion mechanism covers flight-scoped records only; personal
+social records require out-of-band erasure coordination between the pilot and
+the portal. `(R-DUR-17)`
+
 ---
 
 ## 3. Erasure and GDPR compliance
@@ -136,3 +157,5 @@ regardless of non-compliant peers.
 | `private_access_keypair` deleted at node | Stop serving non-public content for that pilot; delete key material | Delete restricted plaintext unless a separate active durability custody grant authorizes retention |
 | `private-access-rotation-record` processed with non-matching key | Stop signing or honoring signatures under the old key | — |
 | Challenge record received | Freeze non-public release for hash | — |
+| Deletion request received for `raw_igc_hash` | Refuse subsequent group-based fetch requests for that hash | — |
+| Pilot-initiated personal-data erasure request | (no protocol mechanism) | Remove pilot's group membership and follow records |
