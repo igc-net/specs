@@ -19,7 +19,7 @@ igc-net distinguishes two independent access concerns:
 
 The protocol represents private access with a single **`private_access_keypair`**
 per pilot. Possession of this keypair is the sole authorization credential for
-all pre-v0.5 non-public IGC content of that pilot. There are no separate per-content-type
+all non-public IGC content of that pilot. There are no separate per-content-type
 keys.
 
 One igc-net service instance may hold `private_access_keypair` material for
@@ -110,7 +110,7 @@ through the node-local login / grant UX described in the operator guides.
 ### 3.2 One keypair, all private content
 
 One `private_access_keypair` grants or revokes access to **all** of a pilot's
-pre-v0.5 non-public IGC content simultaneously. `(R-ACCESS-06)` There is no
+non-public IGC content simultaneously. `(R-ACCESS-06)` There is no
 per-flight or per-artifact-class sub-scoping.
 
 ### 3.3 Key backup
@@ -311,15 +311,15 @@ baseline requirements in `55-governance-sync.md §5`. `(R-ACCESS-27)`
 The normative gRPC surface for this handover is `ProvisionPrivateAccessKey` in
 `proto/igc_net_v0.proto`. Failure modes are:
 
-| Condition | Required failure | Error reason |
-|-----------|------------------|--------------|
-| Malformed `pilot_id`, malformed key bytes, or key/public-key mismatch | reject as invalid argument | `ERROR_REASON_INVALID_ARGUMENT` |
-| Local caller is not authorized to provision keys into this igc-net instance | reject as unauthorized | `ERROR_REASON_UNAUTHORIZED` |
-| No active private-access rotation record is known for the pilot | reject as missing active authorization key | `ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD` |
-| Governance state is stale | reject as governance stale | `ERROR_REASON_GOVERNANCE_STALE` |
-| No durable governance baseline exists | reject as governance stale | `ERROR_REASON_MISSING_GOVERNANCE_BASELINE` |
-| Expected public key is older than the active rotation record | reject as rotated key | `ERROR_REASON_ROTATED_KEY` |
-| State-store write, fsync, or atomic replacement fails | reject as internal failure and do not report success | `ERROR_REASON_INTERNAL` |
+| Condition | Required failure |
+|-----------|------------------|
+| Malformed `pilot_id`, malformed key bytes, or key/public-key mismatch | reject as invalid argument |
+| Local caller is not authorized to provision keys into this igc-net instance | reject as unauthorized |
+| No active private-access rotation record is known for the pilot | reject as missing active authorization key |
+| Governance state is stale | reject as governance stale |
+| No durable governance baseline exists | reject as governance stale |
+| Expected public key is older than the active rotation record | reject as rotated key |
+| State-store write, fsync, or atomic replacement fails | reject as internal failure and do not report success |
 
 For first-portal proof-of-concept deployments, a pre-seeded operator bootstrap
 is allowed: the operator may create or import the initial

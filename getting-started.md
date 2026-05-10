@@ -69,8 +69,8 @@ Each pilot has three Ed25519 credential classes:
 | Key | Purpose |
 |-----|---------|
 | `pilot_id` root key | Signs pilot-authored governance records (claims, publication-mode records, deletion requests, `private-access-rotation-record`, `pilot-auth-did-record`). Does not rotate. |
-| `pilot_auth_did` | Wallet-held authentication / VC-issuer credential. In v0.3 this is the pilot's canonical `did:key`; it signs login challenges and application-layer credentials. |
-| `private_access_keypair` | Authorization credential for pre-v0.5 non-public IGC content belonging to this pilot: signs fetch requests for private raw IGC and protected raw companions. MAY be rotated via `private-access-rotation-record` signed by `pilot_id`. |
+| `pilot_auth_did` | Wallet-held authentication / VC-issuer credential. The pilot's canonical `did:key`; signs login challenges and application-layer credentials. |
+| `private_access_keypair` | Authorization credential for non-public IGC content belonging to this pilot: signs fetch requests for private raw IGC and protected raw companions. MAY be rotated via `private-access-rotation-record` signed by `pilot_id`. |
 
 Public metadata advertisements are signed by the publishing portal's `node_id`.
 They are discovery records, not fetch authorization.

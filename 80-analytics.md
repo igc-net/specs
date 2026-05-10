@@ -1,17 +1,14 @@
 # igc-net — Derived Metadata and Analytics
 
-**Status:** Normative boundary for pre-v0.5  
+**Status:** Normative boundary  
 **Depends on:** `40-pilot-and-metadata.md`
 
 ---
 
 ## 1. Status
 
-Standard analytics records are deferred until after v0.5.
-
-Pre-v0.5 igc-net does not define a native `igc-net/analytics` record, analytics
-topic, merge policy, scoring schema, thermal schema, wind schema, or
-`IGC_META_DOC`.
+igc-net does not define a native analytics record, analytics topic, merge
+policy, scoring schema, thermal schema, wind schema, or `IGC_META_DOC`.
 
 Portals that want to advertise derived data use the public
 `igc-net/metadata-advertisement` record defined in
@@ -42,8 +39,5 @@ is the publishing portal's policy.
 
 Thermal annotations, wind estimates, scoring outputs, task analysis, replay
 geometry, and climb summaries are all valid examples of portal-defined metadata
-advertisements.
-
-These examples are intentionally not standardized in pre-v0.5. If ecosystem
-practice converges around common thermal, wind, or scoring formats, a later
-version may standardize those formats as explicit extension schemas.
+advertisements. These examples are portal-defined and intentionally not
+standardized.

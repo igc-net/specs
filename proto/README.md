@@ -2,10 +2,9 @@
 
 This directory contains the normative gRPC/protobuf contract for igc-net.
 
-During the v0.3 draft period, the contract evolves in place and breaking changes
-are allowed. Rust, Python, and portal clients must regenerate from the current
-files in this directory rather than maintaining implementation-local proto
-forks.
+This contract is normative. Rust, Python, and portal clients must regenerate
+from the current files in this directory rather than maintaining
+implementation-local proto forks.
 
 The proto contract is part of the protocol specification. If generated clients
 or implementation behavior diverge from this directory, this directory is

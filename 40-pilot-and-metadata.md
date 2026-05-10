@@ -8,8 +8,7 @@
 ## 1. Scope
 
 igc-net does not standardize native pilot metadata, native flight metadata,
-IGC-derived provenance records, metadata merge rules, or analytics semantics in
-the pre-v0.5 baseline.
+IGC-derived provenance records, metadata merge rules, or analytics semantics.
 
 The only metadata-plane object in this baseline is a lightweight public
 **metadata advertisement**. It lets a portal announce that it has portal-defined
@@ -146,9 +145,9 @@ access policy for the referenced resource:
 | `private` | The portal expects explicit pilot/portal authorization. |
 | `portal-local` | The resource is meaningful only within the publishing portal. |
 
-For pre-v0.5, igc-net defines no standard fetch path for advertisement
-resources. A portal that follows a `resource_ref` uses portal-specific policy
-and transport outside the core artifact fetch rules. `(R-META-14)`
+igc-net defines no standard fetch path for advertisement resources. A portal
+that follows a `resource_ref` uses portal-specific policy and transport outside
+the core artifact fetch rules. `(R-META-14)`
 
 ---
 

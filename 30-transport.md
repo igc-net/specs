@@ -359,22 +359,9 @@ returned `artifact_bytes`. For `public_raw_igc`, `protected_raw_companion`, and
 the served `artifact_class` so clients can validate response binding without
 inferring it from transport state. `(R-TRANS-28)`
 
-The proto `ErrorReason` values map to this sequence as follows:
-
-| Failure | Error reason |
-|---------|--------------|
-| Node stores are not open or service is not ready | `ERROR_REASON_NODE_NOT_READY` |
-| Governance state or dependency closure is stale | `ERROR_REASON_GOVERNANCE_STALE` |
-| No durable governance baseline is available where required | `ERROR_REASON_MISSING_GOVERNANCE_BASELINE` |
-| Current state is contested | `ERROR_REASON_CONTESTED` |
-| Current state is rejected | `ERROR_REASON_REJECTED` |
-| A deletion request has been processed | `ERROR_REASON_DELETED` |
-| Restricted request lacks a valid fetch proof | `ERROR_REASON_UNAUTHORIZED` |
-| Request uses a superseded private-access key | `ERROR_REASON_ROTATED_KEY` |
-| No active private-access rotation record is known | `ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD` |
-| Requested artifact class is not valid for the current mode | `ERROR_REASON_ARTIFACT_CLASS_NOT_ALLOWED` |
-| Requested valid blob is absent locally or fails hash verification | `ERROR_REASON_MISSING_BLOB` |
-| Request fields are malformed | `ERROR_REASON_INVALID_ARGUMENT` |
+Failures MUST be returned as non-OK gRPC statuses. This draft does not define
+structured error-detail messages; clients MUST NOT rely on a protocol-level
+error-reason enum.
 
 ### 7.7 `QueryIndex` and `SubscribeEvents`
 
