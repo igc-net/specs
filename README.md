@@ -34,10 +34,8 @@ That separation is a protocol constraint, not a documentation convenience.
 
 ## Status Snapshot
 
-- Latest SPECS tagged release: `v0.1.0`
-- Latest REFERENCE IMPLEMENTATION tagged release: `v0.1.0`
-- Current specification work: `v0.3` draft
-- Public `v0.3` release/tag: not yet published
+- Current release: `v0.3`
+- Reference implementation: `igc-net-rs` v0.3.0, `igc-net-py` v0.1.0
 
 ## How to Read This Repository
 
@@ -55,13 +53,14 @@ Read these in dependency order:
 8. [60-keys-and-access.md](./60-keys-and-access.md)
 9. [65-pilot-auth-did.md](./65-pilot-auth-did.md)
 10. [70-durability.md](./70-durability.md)
-11. [80-analytics.md](./80-analytics.md)
-12. [90-conformance.md](./90-conformance.md)
-13. [92-threat-model.md](./92-threat-model.md)
+11. [75-groups-and-social.md](./75-groups-and-social.md)
+12. [80-analytics.md](./80-analytics.md)
+13. [90-conformance.md](./90-conformance.md)
+14. [92-threat-model.md](./92-threat-model.md)
 
 The igc-net gRPC/protobuf contract lives in [proto/](./proto/) and is
-normative during the v0.3 auxiliary-service migration. Generated clients and reference
-implementations must track that contract.
+normative. Generated clients and reference implementations must track that
+contract.
 
 ### Informative guides and contributor docs
 
@@ -96,47 +95,3 @@ Implementation repositories such as `igc-net-rs` and `igc-net-py` are
 informative with respect to the protocol. They may demonstrate feasible
 behavior, but they do not override the specification.
 
-## Planned Work
-
-### v0.3
-
-- use iterative protocol slices: specify, review/test, implement, tighten, then
-  expand
-- tighten gossip, catch-up, and stale-state semantics
-- freeze IGC artifact access semantics for public raw, protected sanitized,
-  protected raw companion, and private raw IGC
-- define the normative igc-net gRPC/protobuf contract in [proto/](./proto/)
-- lightweight public metadata advertisements with portal-defined namespaces
-- `pilot_auth_did` as canonical wallet-held `did:key`
-- optional `did:web` for portal-issued/public-facing issuer identity and
-  non-authoritative public aliases
-- threat model, abuse analysis, extension model, interop fixtures, interop test suite
-
-### v0.4
-
-- add sync-independent performance-oriented and bulk-operation primitives
-- governance hardening, resolver/federation evolution, privacy leakage mitigation
-- add sync-independent observability, health, and auditability primitives
-
-### v0.5
-
-- sync redesign and convergence semantics
-- bulk/state-transfer and replication primitives
-
-### v1.0
-
-v1.0 is to be treated as production release of the standard.
-All the lower version designations are to be considered experimental, and no backwards compatibility should be expected.
-
-The v0.3-v0.5 baseline scope is artifact identity, gossip/discovery, IGC file
-access, governance freshness, igc-net service operation, and conformance for those
-surfaces. Public metadata advertisements are intentionally minimal and
-portal-defined. Standard native metadata records, `igc-metadata`, metadata merge
-policy, standardized analytics schemas, and `IGC_META_DOC` are deferred until
-after v0.5. They may be considered for v1.0 once the v0.5 igc-net service and
-portal baseline is in place.
-
-## Change Process
-
-Protocol changes should be reviewed via issues and pull requests. See
-[CONTRIBUTING.md](./CONTRIBUTING.md).
