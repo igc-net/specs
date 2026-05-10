@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package igc_net.v0;
 
-// Normative draft igc-net gRPC API for the v0.3 migration.
+// Normative igc-net gRPC API — v0.3.
 //
-// The v0 package is intentionally unstable. Breaking changes are allowed while
-// the protocol is in draft.
+// The v0 package name signals that breaking changes are allowed across minor
+// versions. Regenerate clients from this file for each protocol release.
 
 service IgcNet {
   rpc GetNodeStatus(GetNodeStatusRequest) returns (GetNodeStatusResponse);
@@ -23,31 +23,47 @@ service IgcNet {
       returns (ProvisionPrivateAccessKeyResponse);
   rpc RevokePrivateAccess(RevokePrivateAccessRequest)
       returns (RevokePrivateAccessResponse);
+
+  // ── Groups ──────────────────────────────────────────────────────────────────
+
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse);
+  rpc AddPrivateGroupMember(AddPrivateGroupMemberRequest)
+      returns (AddPrivateGroupMemberResponse);
+  rpc RemovePrivateGroupMember(RemovePrivateGroupMemberRequest)
+      returns (RemovePrivateGroupMemberResponse);
+  rpc InviteToPublicGroup(InviteToPublicGroupRequest)
+      returns (InviteToPublicGroupResponse);
+  rpc AcceptGroupInvitation(AcceptGroupInvitationRequest)
+      returns (AcceptGroupInvitationResponse);
+  rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
+  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse);
+  rpc LookupGroupByName(LookupGroupByNameRequest) returns (LookupGroupByNameResponse);
+  rpc ListMyGroups(ListMyGroupsRequest) returns (ListMyGroupsResponse);
+  rpc ListGroupMembers(ListGroupMembersRequest) returns (ListGroupMembersResponse);
+  rpc GetPendingInvitations(GetPendingInvitationsRequest)
+      returns (GetPendingInvitationsResponse);
+
+  // Portal-convenience group RPCs — authenticate via pilot_id + access_pin.
+  rpc PortalCreateGroup(PortalCreateGroupRequest) returns (CreateGroupResponse);
+  rpc PortalAddPrivateGroupMember(PortalAddPrivateGroupMemberRequest)
+      returns (AddPrivateGroupMemberResponse);
+  rpc PortalRemovePrivateGroupMember(PortalRemovePrivateGroupMemberRequest)
+      returns (RemovePrivateGroupMemberResponse);
+  rpc PortalInviteToPublicGroup(PortalInviteToPublicGroupRequest)
+      returns (InviteToPublicGroupResponse);
+  rpc PortalAcceptGroupInvitation(PortalAcceptGroupInvitationRequest)
+      returns (AcceptGroupInvitationResponse);
+  rpc PortalLeaveGroup(PortalLeaveGroupRequest) returns (LeaveGroupResponse);
+
+  // ── Follow ──────────────────────────────────────────────────────────────────
+
+  rpc FollowPilot(FollowPilotRequest) returns (FollowPilotResponse);
+  rpc UnfollowPilot(UnfollowPilotRequest) returns (UnfollowPilotResponse);
+  rpc ListFollowing(ListFollowingRequest) returns (ListFollowingResponse);
+  rpc ListFollowers(ListFollowersRequest) returns (ListFollowersResponse);
 }
 
-// RPC failures are returned as non-OK gRPC statuses. Implementations SHOULD
-// attach or expose one of these reasons in generated-client-specific error
-// detail mechanisms.
-enum ErrorReason {
-  ERROR_REASON_UNSPECIFIED = 0;
-  ERROR_REASON_NODE_NOT_READY = 1;
-  ERROR_REASON_GOVERNANCE_STALE = 2;
-  ERROR_REASON_CONTESTED = 3;
-  ERROR_REASON_REJECTED = 4;
-  ERROR_REASON_DELETED = 5;
-  ERROR_REASON_UNAUTHORIZED = 6;
-  ERROR_REASON_MISSING_PRIVATE_ACCESS_KEY = 7;
-  ERROR_REASON_ROTATED_KEY = 8;
-  ERROR_REASON_MISSING_BLOB = 9;
-  ERROR_REASON_INVALID_ARGUMENT = 10;
-  ERROR_REASON_INTERNAL = 11;
-  ERROR_REASON_MISSING_GOVERNANCE_BASELINE = 12;
-  ERROR_REASON_MISSING_ACTIVE_PRIVATE_ACCESS_RECORD = 13;
-  ERROR_REASON_ARTIFACT_CLASS_NOT_ALLOWED = 14;
-  ERROR_REASON_REVOKED = 15;
-  ERROR_REASON_EVENT_HISTORY_PRUNED = 16;
-  ERROR_REASON_MISSING_OWNER = 17;
-}
+// ── Shared enums ──────────────────────────────────────────────────────────────
 
 message GetNodeStatusRequest {}
 
@@ -86,9 +102,14 @@ message PublishFlightRequest {
 
 message PublishFlightResponse {
   string raw_igc_hash = 1;
-  string protected_hash = 2;
-  repeated string tickets = 3;
-  repeated string companion_tickets = 4;
+  repeated PublishedArtifact artifacts = 2;
+  bool g_record_present = 3;
+}
+
+message PublishedArtifact {
+  ArtifactClass artifact_class = 1;
+  string artifact_hash = 2;
+  string ticket = 3;
 }
 
 enum PublicationMode {
@@ -144,14 +165,30 @@ message IssuePortalAuthTokenResponse {
   string pilot_profile_vc_jwt = 1;
 }
 
+// ── Artifact fetch ────────────────────────────────────────────────────────────
+
+// Proof embedded in FetchArtifactRequest for group-based access.
+// The requester signs with their root pilot identity key (the Ed25519 key
+// embedded in requester_pilot_id).  raw_igc_hash and artifact_class from the
+// outer FetchArtifactRequest are included in the signing payload.
+message GroupFetchProof {
+  string requester_pilot_id = 1;  // igcnet:id:<hex>
+  string group_id = 2;            // igcnet:group:<32-hex>
+  uint64 seq_num = 3;             // monotonic, keyed by requester_pilot_id
+  bytes  signature = 4;           // ed25519 over canonical JSON of the proof payload
+}
+
 message FetchArtifactRequest {
   string raw_igc_hash = 1;
   ArtifactClass artifact_class = 2;
-  // Required for restricted artifact classes (protected_raw_companion, private_raw_igc).
+  // Required for restricted artifact classes (protected_raw_companion, private_raw_igc)
+  // when using private-access key authentication.
   // Signed over RFC-8785 canonical JSON of fields 1-4 using private_access_keypair.
   string requester_key = 3;  // ed25519 public key, lowercase hex
   uint64 seq_num = 4;        // monotonic counter; must exceed server's last-seen for requester_key
   bytes  signature = 5;      // ed25519 signature over canonical JSON of fields 1-4
+  // Alternative: group-based fetch proof (mutually exclusive with fields 3-5).
+  GroupFetchProof group_fetch_proof = 6;
 }
 
 message FetchArtifactResponse {
@@ -185,7 +222,7 @@ message QueryIndexResponse {
 message IndexEntry {
   string raw_igc_hash = 1;
   PublicationMode publication_mode = 2;
-  string protected_hash = 3;
+  optional string protected_hash = 3;
   repeated string serving_node_ids = 4;
   // Artifact classes that this service currently has local bytes for and is
   // willing to expose as locally available under the effective publication mode.
@@ -198,6 +235,9 @@ message IndexEntry {
   bool locally_fetchable = 7;
   // Latest local artifact-registry/event sequence that changed this entry.
   uint64 updated_event_seq = 8;
+  // Known signature-presence signal for the raw IGC bytes. Unset means unknown,
+  // not unsigned.
+  optional bool g_record_present = 9;
 }
 
 enum GovernanceServingState {
@@ -264,4 +304,213 @@ message RevokePrivateAccessResponse {
   // True when the service retained non-secret tombstone state to prevent
   // accidental access resurrection.
   bool tombstone_retained = 4;
+}
+
+// ── Group messages ────────────────────────────────────────────────────────────
+
+enum GroupType {
+  GROUP_TYPE_UNSPECIFIED = 0;
+  GROUP_TYPE_PRIVATE = 1;
+  GROUP_TYPE_PUBLIC = 2;
+}
+
+message GroupSummary {
+  string group_id = 1;
+  GroupType group_type = 2;
+  string creator_pilot_id = 3;
+  // Human-readable unique name; max 128 UTF-8 characters.
+  string name = 4;
+  bool is_owner = 5;
+}
+
+// CreateGroup: signed record generated client-side and submitted to node.
+message CreateGroupRequest {
+  // Serialised GroupCreationRecord JSON (signed by creator's root pilot key).
+  string signed_record_json = 1;
+}
+
+message CreateGroupResponse {
+  string group_id = 1;
+}
+
+message AddPrivateGroupMemberRequest {
+  // Serialised PrivateGroupMemberAddRecord JSON.
+  string signed_record_json = 1;
+}
+
+message AddPrivateGroupMemberResponse {
+  string group_id = 1;
+  string member_pilot_id = 2;
+}
+
+message RemovePrivateGroupMemberRequest {
+  // Serialised PrivateGroupMemberRemoveRecord JSON.
+  string signed_record_json = 1;
+}
+
+message RemovePrivateGroupMemberResponse {
+  string group_id = 1;
+  string member_pilot_id = 2;
+}
+
+message InviteToPublicGroupRequest {
+  // Serialised PublicGroupInviteRecord JSON.
+  string signed_record_json = 1;
+}
+
+message InviteToPublicGroupResponse {
+  string group_id = 1;
+  string invited_pilot_id = 2;
+}
+
+message AcceptGroupInvitationRequest {
+  // Serialised PublicGroupAcceptRecord JSON.
+  string signed_record_json = 1;
+}
+
+message AcceptGroupInvitationResponse {
+  string group_id = 1;
+  string member_pilot_id = 2;
+}
+
+message LeaveGroupRequest {
+  // Serialised PublicGroupLeaveRecord JSON.
+  string signed_record_json = 1;
+}
+
+message LeaveGroupResponse {
+  string group_id = 1;
+  string member_pilot_id = 2;
+}
+
+message ListMyGroupsRequest {
+  // igcnet:id:<hex> — list groups for this pilot.
+  string pilot_id = 1;
+}
+
+message ListMyGroupsResponse {
+  repeated GroupSummary groups = 1;
+}
+
+message GetGroupRequest {
+  string group_id = 1;
+  // Optional. When provided, is_owner in the response is computed for this pilot.
+  string requester_pilot_id = 2;
+}
+
+message GetGroupResponse {
+  GroupSummary group = 1;
+}
+
+message LookupGroupByNameRequest {
+  // Exact group name (case-sensitive). Returns NOT_FOUND if no group matches.
+  string name = 1;
+  // Optional. When provided, is_owner in the response is computed for this pilot.
+  string requester_pilot_id = 2;
+}
+
+message LookupGroupByNameResponse {
+  GroupSummary group = 1;
+}
+
+message ListGroupMembersRequest {
+  string group_id = 1;
+  // Required for access control. Private group member lists are owner-only;
+  // public group member lists require the requester to be a current member.
+  string requester_pilot_id = 2;
+}
+
+message ListGroupMembersResponse {
+  string group_id = 1;
+  repeated string member_pilot_ids = 2;
+}
+
+message GetPendingInvitationsRequest {
+  string pilot_id = 1;
+}
+
+message GetPendingInvitationsResponse {
+  // Full group summaries so callers can display group names without a second round-trip.
+  repeated GroupSummary groups = 1;
+}
+
+// ── Portal-convenience group messages ────────────────────────────────────────
+
+message PortalCreateGroupRequest {
+  string pilot_id = 1;
+  string access_pin = 2;
+  GroupType group_type = 3;
+  // Empty string means no name.
+  string name = 4;
+}
+
+message PortalAddPrivateGroupMemberRequest {
+  string pilot_id = 1;
+  string access_pin = 2;
+  string group_id = 3;
+  string member_pilot_id = 4;
+}
+
+message PortalRemovePrivateGroupMemberRequest {
+  string pilot_id = 1;
+  string access_pin = 2;
+  string group_id = 3;
+  string member_pilot_id = 4;
+}
+
+message PortalInviteToPublicGroupRequest {
+  string pilot_id = 1;
+  string access_pin = 2;
+  string group_id = 3;
+  string invited_pilot_id = 4;
+}
+
+message PortalAcceptGroupInvitationRequest {
+  string pilot_id = 1;
+  string access_pin = 2;
+  string group_id = 3;
+}
+
+message PortalLeaveGroupRequest {
+  string pilot_id = 1;
+  string access_pin = 2;
+  string group_id = 3;
+}
+
+// ── Follow messages ───────────────────────────────────────────────────────────
+
+message FollowPilotRequest {
+  // Serialised FollowRecord JSON.
+  string signed_record_json = 1;
+}
+
+message FollowPilotResponse {
+  string follower_pilot_id = 1;
+  string followee_pilot_id = 2;
+}
+
+message UnfollowPilotRequest {
+  // Serialised UnfollowRecord JSON.
+  string signed_record_json = 1;
+}
+
+message UnfollowPilotResponse {
+  string follower_pilot_id = 1;
+  string followee_pilot_id = 2;
+}
+
+message ListFollowingRequest {
+  string pilot_id = 1;
+}
+
+message ListFollowingResponse {
+  repeated string followee_pilot_ids = 1;
+}
+
+message ListFollowersRequest {
+  string pilot_id = 1;
+}
+
+message ListFollowersResponse {
+  repeated string follower_pilot_ids = 1;
 }
