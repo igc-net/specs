@@ -46,6 +46,8 @@ Think in classes:
 | Protected raw companion | The unsanitized raw IGC of a `protected` flight — plaintext, gated on signed fetch |
 | Private raw IGC | The raw IGC of a `private` flight — plaintext, gated on signed fetch |
 | Governance records | Claims, approvals, challenges, resolutions, mode changes, deletion requests, `private-access-rotation-record`, `pilot-auth-did-record`, roster updates |
+| Group records | `GroupCreationRecord`, `PrivateGroupMemberAdd/Remove`, `PublicGroupInvite/Accept/Leave` — govern group-based fetch authorization |
+| Follow records | `FollowRecord`, `UnfollowRecord` — drive notification delivery |
 
 Governance records are not just informational. They change what the node is
 allowed to serve.
@@ -102,8 +104,8 @@ Keep "we have it" separate from "anyone may fetch it".
 |---|---|
 | `public` | Raw artifact to anyone |
 | `protected` sanitized | Openly to anyone |
-| `protected` raw companion | Only to requesters with a fetch request signed by the pilot's currently authorized `private_access_keypair` |
-| `private` raw IGC | Only to requesters with a fetch request signed by the pilot's currently authorized `private_access_keypair` |
+| `protected` raw companion | To requesters presenting either (a) a fetch request signed by the pilot's currently authorized `private_access_keypair`, or (b) a valid `GroupFetchProof` demonstrating current group membership |
+| `private` raw IGC | To requesters presenting either (a) a fetch request signed by the pilot's currently authorized `private_access_keypair`, or (b) a valid `GroupFetchProof` demonstrating current group membership |
 
 The "currently authorized" public key for each pilot is whichever one
 is bound by the most recent valid `private-access-rotation-record` on
@@ -148,6 +150,7 @@ in your terms of service and your operational runbook.
 5. Stop serving immediately on delete, challenge, restrictive mode change, or rotation record.
 6. Protect plaintext private content at rest (disk encryption, access control, audit).
 7. Keep a clear local policy for what the node stores, announces, and deletes.
+8. Process group records from the data plane; verify `GroupFetchProof` credentials before serving restricted content to group members (`75-groups-and-social.md §5`).
 
 ## Read Next
 
@@ -157,3 +160,4 @@ in your terms of service and your operational runbook.
 - `55-governance-sync.md`
 - `60-keys-and-access.md`
 - `70-durability.md`
+- `75-groups-and-social.md`

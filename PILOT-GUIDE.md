@@ -52,11 +52,26 @@ The two actions are clearly separate in your head:
 
 You can revoke private access at any time without signing out (see below).
 
+## Groups and Follow
+
+Groups let you share private flight access with specific pilots without making your flights public.
+
+| Type | What it means |
+|---|---|
+| Private group | You are the owner. You add members individually. Members can fetch all of your non-public flights — past and future — via a `GroupFetchProof`, without needing your `private_access_keypair`. |
+| Public group | Opt-in. Any member's flights are accessible to all other current members, regardless of publication mode. Membership is by invitation and explicit acceptance. |
+
+**Follow** — subscribe to another pilot's upload notifications. Your access to their flights still follows their publication mode, elevated if you share a group with them.
+
+Group records are signed by you and stored on the data plane; no trusted resolver approval is required.
+
 ## Your `private_access_keypair`
 
 This is a single Ed25519 keypair that controls access to all of your
 non-public IGC content: private IGC files and protected raw
-companions.
+companions. It is one of two paths that authorize non-public fetch
+requests — the other is a `GroupFetchProof` from a group you own or
+belong to.
 
 Your home portal (or self-hosted node) generates this keypair and
 helps you back it up. When you want to grant a new private-access
@@ -77,6 +92,12 @@ portal you no longer trust) without affecting the others.
 Ask that node to delete its copy of your `private_access_keypair`.
 Compliant nodes honor this immediately. After deletion the node
 cannot sign new fetch requests for your private content.
+
+If you cannot trust the node to cooperate (for example, a compromised
+portal), asking it to delete is not sufficient — you must also publish
+a `private-access-rotation-record` signed by your `pilot_id`. Compliant
+nodes stop honoring fetch-request signatures under the superseded key as
+soon as they process the rotation record.
 
 ## Recovering If You Lose Everything
 
@@ -105,8 +126,10 @@ Important limits:
 - `protected` is not the same as `private`.
 - `protected` hides identity in the public artifact, not necessarily from a
   portal that already has private access to your profile.
-- `private` hides content, not the existence-level protocol state
-  (other portals can see that a `raw_igc_hash` exists and is yours).
+- `private` hides content, not the existence of the hash — the
+  `raw_igc_hash` is broadcast on the data-plane announce topic and may
+  be discovered by any participating node. Linking the hash to your
+  pilot identity requires querying governance state separately.
 - No flight content is encrypted at the protocol layer. Transport
   confidentiality is provided by iroh's end-to-end encryption between
   nodes; at-rest confidentiality is a legal and compliance obligation
@@ -169,10 +192,12 @@ For most pilots, the simplest workable model is:
 5. Use `private` when you do not want the flight track publicly visible.
 6. Keep a secure backup of your `private_access_keypair`. Rotate it
    if you believe a node has been compromised.
+7. Use private groups to share non-public flights with specific pilots
+   without changing your publication mode.
 
 ## Read Next
 
 - `NODE-OPERATOR-GUIDE.md` if you run your own node
 - `PORTAL-OPERATOR-GUIDE.md` if you are evaluating a portal integration
-- `20-artifacts.md`, `40-pilot-and-metadata.md`, `50-governance.md`, and
-  `60-keys-and-access.md` for the underlying rules
+- `20-artifacts.md`, `40-pilot-and-metadata.md`, `50-governance.md`,
+  `60-keys-and-access.md`, and `75-groups-and-social.md` for the underlying rules

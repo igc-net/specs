@@ -49,7 +49,7 @@ able to read after the grant.
 
 ## Common-Case Product Flows
 
-Most portals need to get five flows right:
+Most portals need to get six flows right:
 
 1. Upload with a clear `public` / `protected` / `private` choice.
 2. Explain what trust the pilot is granting (and clearly separate
@@ -60,6 +60,9 @@ Most portals need to get five flows right:
    `private-access-rotation-record`.
 5. Display protected flights without assuming identity display is
    allowed.
+6. Manage group membership: create groups, add/remove members for
+   private groups, invite/accept/leave for public groups, and
+   follow/unfollow pilots.
 
 Everything else is secondary.
 
@@ -72,6 +75,7 @@ Do not collapse everything into one generic flight object.
 | Public storage | Public raw artifacts, protected sanitized artifacts, public indexes |
 | Restricted storage | Protected raw companion plaintext, private raw IGC plaintext |
 | Governance state | Claims, approvals, challenges, resolutions, mode changes, deletion requests, `private-access-rotation-record`, `pilot-auth-did-record`, roster updates |
+| Group and follow records | `GroupCreationRecord`, member-add/remove, invite/accept/leave, `FollowRecord`, `UnfollowRecord` — govern group-based fetch access and follow notifications |
 
 Restricted storage means stricter serving rules, cache invalidation
 on rotation/revocation, and delete handling. It is plaintext at rest
@@ -95,6 +99,8 @@ Your portal must do these correctly:
 - No scraping of personal-identity fields from IGC headers outside
   records the pilot has explicitly authorized (see
   `60-keys-and-access.md §2.1`).
+- Stop serving group-based fetch requests for a `raw_igc_hash` once a valid
+  deletion request for that hash has been processed.
 - Metadata advertisements are public, portal-defined discovery records. Do not
   publish derived values that your portal policy treats as sensitive.
 
@@ -111,6 +117,7 @@ Use the reference implementation or a shared protocol layer for:
 - pilot authentication DID state interpretation
 - fetch-request signing and validation against the current
   `private_access_public_key`
+- group-membership state interpretation and `GroupFetchProof` verification
 
 Keep portal-specific code focused on:
 
@@ -127,9 +134,9 @@ JSON, and the transport is iroh.
 
 ## Portal Authentication Trust Model
 
-igc-net authenticates pilots solely via `(pilot_hash, access_pin) → PilotProfileCredentialJWT`.
+igc-net authenticates pilots solely via `(pilot_id, access_pin) → PilotProfileCredentialJWT`.
 The network holds no email addresses, session state, or recovery data. Portals that want
-to spare their users from typing a raw hash and PIN on every visit act as **credential brokers**:
+to spare their users from typing a raw `pilot_id` and PIN on every visit act as **credential brokers**:
 they authenticate the user through their own mechanism and call igc-net on the user's behalf.
 
 ### The broker model
@@ -162,8 +169,8 @@ they authenticate the user through their own mechanism and call igc-net on the u
   with a key derived from hardware authenticator PRF output — not feasible. The PIN is
   random and high-entropy, so offline dictionary attacks do not apply.
 - **If a pilot loses all their passkey devices,** the portal cannot recover their PIN.
-  Recovery requires the pilot to supply their pilot hash and the recovery PIN shown once at
-  registration, then re-enroll a new passkey. The pilot hash is the cross-portal identity
+  Recovery requires the pilot to supply their `pilot_id` and the recovery PIN shown once at
+  registration, then re-enroll a new passkey. `pilot_id` is the cross-portal identity
   token — pilots should be encouraged to save it (e.g. screenshot the QR code).
 
 ### Informed consent at registration
@@ -173,22 +180,22 @@ Registration UX MUST:
 - Describe that the portal holds encrypted igc-net credentials on the pilot's behalf.
 - Show the plaintext PIN exactly once as a **recovery code** for offline storage. The user
   must acknowledge this before proceeding.
-- Show the pilot hash as a QR code for cross-portal portability.
+- Show the `pilot_id` as a QR code for cross-portal portability.
 - State in plain language that losing both the recovery code and all passkey devices means
   permanent loss of access to this igc-net identity.
 
 ### QR / hash-only pilots
 
-Pilots who already have a pilot hash (registered on another portal or directly) can import
-it via QR code scan or paste. The portal verifies the `(hash, pin)` pair against the sidecar
-using `IssuePortalAuthToken`, then proceeds to passkey enrollment. Email is optional in this
-path. No igc-net changes are needed for cross-portal import.
+Pilots who already have a `pilot_id` (registered on another portal or directly) can import
+it via QR code scan or paste. The portal verifies the `(pilot_id, pin)` pair against the
+sidecar using `IssuePortalAuthToken`, then proceeds to passkey enrollment. Email is optional
+in this path. No igc-net changes are needed for cross-portal import.
 
 ### What igc-net does NOT need to provide
 
 Under this model, igc-net does not need to store or verify email addresses, issue recovery
-tokens, or maintain session state. All of that is a portal concern. The hash is the only
-identity token igc-net manages; email is a portal-level convenience that binds to the hash
+tokens, or maintain session state. All of that is a portal concern. `pilot_id` is the only
+identity token igc-net manages; email is a portal-level convenience that binds to `pilot_id`
 within that portal's local database.
 
 ---
@@ -220,3 +227,4 @@ Before shipping a portal integration, verify:
 - `55-governance-sync.md`
 - `60-keys-and-access.md`
 - `70-durability.md`
+- `75-groups-and-social.md`

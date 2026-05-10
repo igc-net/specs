@@ -188,7 +188,7 @@ state and key-possession proof.
 | announce topic | The well-known publish/subscribe topic for data-plane announcements |
 | canonical JSON | RFC 8785 serialisation used for signing and record-ID computation |
 | `record_id` | `BLAKE3(canonical_json(record_without_signature))` |
-| `GroupId` | `igcnet:group:<32 lowercase hex chars>` — stable, immutable identifier for a group; derived from 16 random bytes generated at group creation |
+| `GroupId` | `igcnet:group:<32 lowercase hex chars>` — stable, immutable identifier for a group; content-addressed from the creation-record fields (`group_type`, `creator_pilot_id`, `name`, `created_at`) via BLAKE3 |
 | private group | Pilot-created group; the owner adds members who gain access to all of the owner's non-public flights (past and future) |
 | public group | Opt-in group; membership obligates sharing all of a pilot's flights with all other group members, regardless of publication mode |
 | `GroupFetchProof` | Signed wire credential presented in a `FetchArtifactRequest` to authorize access via group membership, as an alternative to the `private_access_keypair` path |
